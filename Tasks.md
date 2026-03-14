@@ -5,8 +5,8 @@
 2.	Слушать команду, в особенности тестировщика.
 
 Что сделал frontend: 
-1.	[Графики (доходы, расходы, расходы vs доходы, круговая, пузырьковая, столбцевая).} (https://excalidraw.com/#json=CI8n99VZ4yBM-hX73zIeY,gNyiZfwp8rgpAWefq54_DA) ✅
-2.	[Про PWA узнать побольше. Что входит в это, и как сайт превращается в PWA.] (https://excalidraw.com/#json=CI8n99VZ4yBM-hX73zIeY,gNyiZfwp8rgpAWefq54_DA) ✅
+1.	[Графики (доходы, расходы, расходы vs доходы, круговая, пузырьковая, столбцевая)](https://excalidraw.com/#json=CI8n99VZ4yBM-hX73zIeY,gNyiZfwp8rgpAWefq54_DA) ✅
+2.	[Про PWA узнать побольше. Что входит в это, и как сайт превращается в PWA.](https://excalidraw.com/#json=CI8n99VZ4yBM-hX73zIeY,gNyiZfwp8rgpAWefq54_DA) ✅
 3.  Инициализировать проект через npm create vite@latest (выбирать React + TS). ✅
 4.  Установить и настроить vite-plugin-pwa — он создаст базовый манифест и зарегистрирует service worker. ✅
 5.  Создать черновой макет главной страницы с одним графиком (Recharts) и списком трат, чтобы проверить, как это выглядит на мобильном телефоне.
