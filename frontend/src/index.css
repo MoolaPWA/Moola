@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+/* 1. Настройка цветовых переменных (для Shadcn) */
+@theme {
+    --font-sans: "Geist", "Inter", ui-sans-serif, system-ui;
+
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
+
+    /* Добавить сюда остальные переменные (card, muted, destructive), если буду их менять */
+}
+
+/* 2. Глобальные настройки отображения */
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --primary: 222.2 47.4% 11.2%;
+        --primary-foreground: 210 40% 98%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 0.5rem;
+    }
+
+    * {
+        @apply border-border; /* Все границы элементов по умолчанию будут цвета border */
+    }
+
+    body {
+        @apply bg-background text-foreground antialiased; /* antialiased делает шрифты чище на Mac */
+        font-feature-settings: "cv11", "ss01"; /* Улучшает читаемость цифр*/
+    }
+}
+
+/* 3. Фикс для PWA (отключает выделение текста при тапах на мобилках) */
+@layer utilities {
+    .tap-highlight-none {
+        -webkit-tap-highlight-color: transparent;
+    }
+}
