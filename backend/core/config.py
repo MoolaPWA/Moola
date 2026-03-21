@@ -28,10 +28,15 @@ class DatabaseConfig(BaseModel):
     host: str = '127.0.0.1'
     port: str = os.getenv("DB_PORT", "5433")
 
+    echo: bool = False
+    echo_pool: bool = False
+    pool_size: int = 50
+    max_overflow: int = 10
+
     @property
     def url(self) -> str:
         """Строка подключения к базе данных (формируется из полей)"""
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
 
 class Settings(BaseSettings):
     run: RunConfig = RunConfig()
