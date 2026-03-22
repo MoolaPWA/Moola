@@ -25,8 +25,8 @@ class DatabaseConfig(BaseModel):
     user: str = os.getenv("DB_USER")
     password: str = os.getenv("DB_PASSWORD")
     name: str = os.getenv("DB_NAME")
-    host: str = '127.0.0.1'
-    port: str = os.getenv("DB_PORT", "5433")
+    host: str = os.getenv("DB_HOST")
+    port: str = os.getenv("DB_PORT")
 
     echo: bool = False
     echo_pool: bool = False

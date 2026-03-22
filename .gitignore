@@ -1,3 +1,4 @@
 .env
 database/pgdata/
 __pycache__
+venv
