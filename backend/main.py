@@ -9,7 +9,7 @@ from core.db_helper import db_helper
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    #startup
+    # startup
     yield
     # shutdown
     print("dispose engine")
