@@ -1,4 +1,49 @@
+# Dependencies
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Env & secrets
 .env
-database/pgdata/
-__pycache__
-venv
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Build
+dist/
+build/
+out/
+*.map
+coverage/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Database
+*.sqlite
+*.db
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# Temp
+*.tmp
+*.cache
