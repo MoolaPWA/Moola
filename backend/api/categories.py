@@ -17,5 +17,6 @@ async def create_category_endpoint(
 @router.get("", response_model=list[CategoryRead])
 async def list_categories(
     session: AsyncSession = Depends(db_helper.session_getter),
+    category_data: CategoryCreate = Depends()
 ):
-    return await get_categories(session)
+    return await get_categories(session, user_id=category_data.user_id)
