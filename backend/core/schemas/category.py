@@ -18,5 +18,7 @@ class CategoryCreate(CategoryBase):
 class CategoryRead(CategoryBase):
     id: UUID = Field(..., description="Уникальный идентификатор категории")
     user_id: UUID = Field(..., description="ID пользователя")
+    cat_limit: float | None = Field(None, description="Лимит категории")
+    id_icon: str = Field(..., description="Идентификатор иконки категории")
 
     model_config = {"from_attributes": True}
