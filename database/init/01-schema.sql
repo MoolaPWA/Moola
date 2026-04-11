@@ -15,6 +15,8 @@ CREATE TABLE categories (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     type VARCHAR(10) NOT NULL CHECK (type IN ('income', 'expense')),
+    cat_limit DECIMAL(12,2) CHECK (cat_limit >= 0),  -- для категорий расходов
+    id_icon VARCHAR(50) NOT NULL,  -- идентификатор иконки из набора (например, FontAwesome)
     UNIQUE (user_id, name, type)  -- уникальность названия в рамках одного типа у пользователя
 );
 
