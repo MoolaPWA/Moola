@@ -1,28 +1,20 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-)
-from crud.users import create_user, get_all_users
+from fastapi import APIRouter, Depends, HTTPException, status
+from crud.users import get_all_users
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
-from core.schemas.user import UserCreate, UserRead
+from core.schemas.user import UserRead
+from core.auth import get_current_user
+from core.models import User
 
-router = APIRouter(
-    prefix="/users",
-    tags=["Users"],
-)
+router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.get("", response_model=list[UserRead])
 async def get_users(
-    session: AsyncSession = Depends(db_helper.session_getter)
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
 ):
+    # Опционально: проверка прав администратора
+    # if not current_user.is_admin:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
     users = await get_all_users(session=session)
     return users
-
-@router.post("", response_model=UserRead)
-async def create_user_endpoint(
-    user_data: UserCreate,
-    session: AsyncSession = Depends(db_helper.session_getter)
-):
-    return await create_user(session, user_data.name, user_data.email, user_data.password)
-

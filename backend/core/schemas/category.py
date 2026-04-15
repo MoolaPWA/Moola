@@ -1,6 +1,6 @@
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal
+from typing import Literal, Optional
 
 class CategoryBase(BaseModel):
     name: str = Field(..., max_length=100, description="Название категории")
@@ -12,13 +12,21 @@ class CategoryBase(BaseModel):
             raise ValueError('Название категории не может быть пустым')
         return v
 
+# Схема для запроса от клиента (без user_id)
+class CategoryCreateRequest(BaseModel):
+    name: str
+    type: Literal['income', 'expense']
+
+# Схема для внутреннего использования (с user_id и опциональными полями)
 class CategoryCreate(CategoryBase):
-    user_id: UUID = Field(..., description="ID пользователя, которому принадлежит категория")
+    user_id: UUID
+    cat_limit: Optional[float] = None
+    id_icon: str = "default_icon"
 
 class CategoryRead(CategoryBase):
-    id: UUID = Field(..., description="Уникальный идентификатор категории")
-    user_id: UUID = Field(..., description="ID пользователя")
-    cat_limit: float | None = Field(None, description="Лимит категории")
-    id_icon: str = Field(..., description="Идентификатор иконки категории")
+    id: UUID
+    user_id: UUID
+    cat_limit: Optional[float] = None
+    id_icon: str
 
     model_config = {"from_attributes": True}

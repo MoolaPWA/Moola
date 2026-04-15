@@ -9,7 +9,8 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
         user_id=transaction_data.user_id,
         category_id=transaction_data.category_id,
         amount=transaction_data.amount,
-        date=transaction_data.date,
+        type=transaction_data.type,
+        transaction_date=transaction_data.transaction_date,  # исправлено
         description=transaction_data.description
     )
     session.add(new_transaction)
