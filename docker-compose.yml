@@ -16,13 +16,14 @@ services:
     build: ./backend
     container_name: fastapi_app
     ports:
-      - "8000:8000"
+    - "8000:8000"
     environment:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
       DB_HOST: postgres
       DB_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - postgres
     volumes:

@@ -3,7 +3,7 @@ import { categoryService } from './categoryService';
 import { transactionService } from './transactionService';
 import type { Category, Transaction } from '../database';
 
-// Создать категорию и сразу первую транзакцию (атомарно)
+// Создать категорию + транзакцию (атомарно)
 export async function createCategoryWithTransaction(
     categoryData: Omit<Category, 'id'>,
     transactionData: Omit<Transaction, 'id' | 'category_id'>
@@ -31,11 +31,7 @@ export async function deleteCategoryWithTransactions(
 
     await db.transaction('rw', [db.categories, db.transactions], async () => {
         // Сначала удаляем все транзакции этой категории
-        const transactions = await transactionService.getByCategory(categoryId);
-
-        for (const t of transactions) {
-            await transactionService.delete(t.id);
-        }
+        await db.transactions.where('category_id').equals(categoryId).delete();
 
         // Затем саму категорию
         await categoryService.delete(categoryId);
@@ -65,9 +61,9 @@ export async function markTransactionsSynced(
 ): Promise<void> {
 
     await db.transaction('rw', [db.transactions], async () => {
-        for (const id of transactionIds) {
-            await transactionService.update(id, { is_synced: 1 });
-        }
-        // Если хоть одно обновление упало — все откатятся
+
+        await db.transactions.where('id').anyOf(transactionIds).modify({ is_synced: 1 });
+
+        // Если хоть одно обновление упало, все откатятся
     });
 }
