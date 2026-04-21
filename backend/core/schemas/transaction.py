@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
 class TransactionBase(BaseModel):
