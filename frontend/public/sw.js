@@ -6,7 +6,7 @@ const db = new Dexie('MoolaDB');
 db.version(2).stores({
     users: 'id',
     categories: 'id, user_id',
-    transactions: 'id, user_id, category_id, transaction_date, is_synced',
+    transactions: 'id, user_id, category_id, transaction_date, is_synced, is_deleted',
 });
 
 const SW_ALLOWED_STORES = ['transactions'];
