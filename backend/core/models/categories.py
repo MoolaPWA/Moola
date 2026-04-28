@@ -1,7 +1,8 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, String, Numeric, ForeignKey, Enum, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from core.db_helper import Base
 import enum
 
@@ -21,3 +22,8 @@ class Category(Base):
 
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
+
+    __table_args__ = (
+        Index("idx_categories_user_id", "user_id"),
+        UniqueConstraint("user_id", "name", "type", name="categories_user_id_name_type_key"),
+    )

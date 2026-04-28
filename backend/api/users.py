@@ -13,8 +13,15 @@ async def get_users(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
 ):
-    # Опционально: проверка прав администратора
+    # Если необходимо, проверяем роль администратора
     # if not current_user.is_admin:
     #     raise HTTPException(status_code=403, detail="Not enough permissions")
-    users = await get_all_users(session=session)
-    return users
+
+    try:
+        users = await get_all_users(session=session)
+        return users
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users"
+        )

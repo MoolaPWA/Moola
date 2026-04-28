@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -69,8 +69,12 @@ async def get_current_user(
 
 
 async def create_refresh_token_in_db(session: AsyncSession, user_id: UUID, token: str) -> RefreshToken:
-    expires_at = datetime.utcnow() + timedelta(days=settings.token.refresh_token_expire_days)
-    refresh_token = RefreshToken(user_id=user_id, token=token, expires_at=expires_at)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.token.refresh_token_expire_days)
+    refresh_token = RefreshToken(
+        user_id=user_id,
+        token=token,
+        expires_at=expires_at
+    )
     session.add(refresh_token)
     await session.commit()
     await session.refresh(refresh_token)
@@ -91,5 +95,5 @@ async def get_refresh_token(session: AsyncSession, token: str) -> RefreshToken |
 async def revoke_refresh_token(session: AsyncSession, token: str) -> None:
     refresh_token = await get_refresh_token(session, token)
     if refresh_token:
-        refresh_token.revoked = datetime.utcnow()
+        refresh_token.revoked = datetime.now(timezone.utc)
         await session.commit()

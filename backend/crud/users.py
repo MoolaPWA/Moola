@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import Sequence
+from sqlalchemy import select, update, delete
+from typing import Sequence, Optional
+from uuid import UUID
 from core.models import User
 
 async def get_all_users(session: AsyncSession) -> Sequence[User]:
@@ -8,13 +9,48 @@ async def get_all_users(session: AsyncSession) -> Sequence[User]:
     result = await session.scalars(stmt)
     return result.all()
 
+async def get_user_by_id(session: AsyncSession, user_id: UUID) -> Optional[User]:
+    stmt = select(User).where(User.id == user_id)
+    result = await session.scalar(stmt)
+    return result
+
+async def get_user_by_email(session: AsyncSession, email: str) -> Optional[User]:
+    stmt = select(User).where(User.email == email)
+    result = await session.scalar(stmt)
+    return result
+
 async def create_user(session: AsyncSession, name: str, email: str, hashed_password: str) -> User:
+    # Валидация: проверяем, нет ли пользователя с таким email
+    existing = await get_user_by_email(session, email)
+    if existing:
+        raise ValueError(f"User with email '{email}' already exists")
+
     new_user = User(name=name, email=email, hashed_password=hashed_password)
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
     return new_user
 
-async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
-    result = await session.execute(select(User).where(User.email == email))
+async def update_user(
+    session: AsyncSession,
+    user_id: UUID,
+    **kwargs
+) -> Optional[User]:
+    # Валидация: если обновляется email, проверить уникальность
+    if 'email' in kwargs:
+        existing = await session.scalar(select(User).where(
+            User.email == kwargs['email'], User.id != user_id
+        ))
+        if existing:
+            raise ValueError(f"User with email '{kwargs['email']}' already exists")
+
+    stmt = update(User).where(User.id == user_id).values(**kwargs).returning(User)
+    result = await session.execute(stmt)
+    await session.commit()
     return result.scalar_one_or_none()
+
+async def delete_user(session: AsyncSession, user_id: UUID) -> bool:
+    stmt = delete(User).where(User.id == user_id)
+    result = await session.execute(stmt)
+    await session.commit()
+    return result.rowcount > 0

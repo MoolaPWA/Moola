@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Enum, Text
+from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Enum, Text, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.db_helper import Base
 from core.models.categories import TransactionType
@@ -16,8 +17,14 @@ class Transaction(Base):
     type = Column(Enum(TransactionType), nullable=False)
     transaction_date = Column(DateTime(timezone=True), nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default="now()")
-    updated_at = Column(DateTime(timezone=True), server_default="now()", onupdate="now()")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
+
+    __table_args__ = (
+        Index("idx_transactions_user_date", "user_id", "transaction_date", postgresql_ops={"transaction_date": "DESC"}),
+        Index("idx_transactions_user_category", "user_id", "category_id"),
+        Index("idx_transactions_user_type", "user_id", "type"),
+    )

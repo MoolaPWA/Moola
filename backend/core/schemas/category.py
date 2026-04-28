@@ -3,30 +3,28 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
 
 class CategoryBase(BaseModel):
-    name: str = Field(..., max_length=100, description="Название категории")
-    type: Literal['income', 'expense'] = Field(..., description="Тип категории: доход или расход")
+    name: str = Field(..., min_length=2, max_length=100, description="Название категории")
+    type: Literal['income', 'expense'] = Field(..., description="Тип категории")
 
     @field_validator('name')
-    def name_not_empty(cls, v):
-        if not v.strip():
+    def name_not_empty(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
             raise ValueError('Название категории не может быть пустым')
-        return v
+        return stripped
 
-# Схема для запроса от клиента (без user_id)
-class CategoryCreateRequest(BaseModel):
-    name: str
-    type: Literal['income', 'expense']
+class CategoryCreateRequest(CategoryBase):
+    """Схема для запроса от клиента (без user_id)"""
+    pass
 
-# Схема для внутреннего использования (с user_id и опциональными полями)
 class CategoryCreate(CategoryBase):
     user_id: UUID
-    cat_limit: Optional[float] = None
-    id_icon: str = "default_icon"
+    cat_limit: Optional[float] = Field(None, ge=0, description="Лимит категории (если задан)")
+    id_icon: str = Field("default_icon", max_length=50)
 
 class CategoryRead(CategoryBase):
     id: UUID
     user_id: UUID
-    cat_limit: Optional[float] = None
+    cat_limit: Optional[float]
     id_icon: str
-
     model_config = {"from_attributes": True}
