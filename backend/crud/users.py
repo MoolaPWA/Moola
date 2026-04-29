@@ -34,17 +34,16 @@ async def create_user(session: AsyncSession, name: str, email: str, hashed_passw
 async def update_user(
     session: AsyncSession,
     user_id: UUID,
-    **kwargs
+    name: str,
+    email: str,
+    hashed_password: str,
 ) -> Optional[User]:
-    # Валидация: если обновляется email, проверить уникальность
-    if 'email' in kwargs:
-        existing = await session.scalar(select(User).where(
-            User.email == kwargs['email'], User.id != user_id
-        ))
-        if existing:
-            raise ValueError(f"User with email '{kwargs['email']}' already exists")
-
-    stmt = update(User).where(User.id == user_id).values(**kwargs).returning(User)
+    existing = await get_user_by_email(session, email)
+    if existing and existing.id != user_id:
+        raise ValueError("Email already exists")
+    stmt = update(User).where(User.id == user_id).values(
+        name=name, email=email, hashed_password=hashed_password
+    ).returning(User)
     result = await session.execute(stmt)
     await session.commit()
     return result.scalar_one_or_none()
@@ -54,3 +53,20 @@ async def delete_user(session: AsyncSession, user_id: UUID) -> bool:
     result = await session.execute(stmt)
     await session.commit()
     return result.rowcount > 0
+
+async def patch_user(
+    session: AsyncSession,
+    user_id: UUID,
+    patch_data: dict,
+) -> Optional[User]:
+    # Если передан email, проверить уникальность
+    if 'email' in patch_data:
+        existing = await get_user_by_email(session, patch_data['email'])
+        if existing and existing.id != user_id:
+            raise ValueError("Email already exists")
+    # Если передан пароль – хешировать (хеширование делаем в API слое, или здесь)
+    # В API будет вызван get_password_hash до вызова этой функции
+    stmt = update(User).where(User.id == user_id).values(**patch_data).returning(User)
+    result = await session.execute(stmt)
+    await session.commit()
+    return result.scalar_one_or_none()

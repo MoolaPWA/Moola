@@ -10,8 +10,15 @@ async def get_category_by_id(session: AsyncSession, category_id: UUID) -> Option
     result = await session.scalar(stmt)
     return result
 
-async def get_categories_by_user(session: AsyncSession, user_id: UUID) -> Sequence[Category]:
-    stmt = select(Category).where(Category.user_id == user_id).order_by(Category.name)
+async def get_categories_by_user(
+    session: AsyncSession,
+    user_id: UUID,
+    type_filter: Optional[str] = None,
+) -> Sequence[Category]:
+    stmt = select(Category).where(Category.user_id == user_id)
+    if type_filter:
+        stmt = stmt.where(Category.type == type_filter)
+    stmt = stmt.order_by(Category.name)
     result = await session.scalars(stmt)
     return result.all()
 
@@ -44,29 +51,28 @@ async def create_category(session: AsyncSession, category_data: CategoryCreate) 
 async def update_category(
     session: AsyncSession,
     category_id: UUID,
-    **kwargs
+    user_id: UUID,
+    name: str,
+    type: str,
 ) -> Optional[Category]:
     category = await get_category_by_id(session, category_id)
-    if not category:
-        raise ValueError("Category not found")
-
-    # Если обновляются name или type, проверить уникальность
-    new_name = kwargs.get('name', category.name)
-    new_type = kwargs.get('type', category.type)
-    if (new_name != category.name) or (new_type != category.type):
-        existing = await session.scalar(select(Category).where(
-            Category.user_id == category.user_id,
-            Category.name == new_name,
-            Category.type == new_type,
+    if not category or category.user_id != user_id:
+        raise ValueError("Category not found or not owned by user")
+    existing = await session.scalar(
+        select(Category).where(
+            Category.user_id == user_id,
+            Category.name == name,
+            Category.type == type,
             Category.id != category_id
-        ))
-        if existing:
-            raise ValueError(f"Category '{new_name}' of type '{new_type}' already exists for this user")
-
-    stmt = update(Category).where(Category.id == category_id).values(**kwargs).returning(Category)
-    result = await session.execute(stmt)
+        )
+    )
+    if existing:
+        raise ValueError("Category with this name and type already exists")
+    category.name = name
+    category.type = type
     await session.commit()
-    return result.scalar_one_or_none()
+    await session.refresh(category)
+    return category
 
 async def delete_category(session: AsyncSession, category_id: UUID) -> bool:
     category = await get_category_by_id(session, category_id)
@@ -77,3 +83,33 @@ async def delete_category(session: AsyncSession, category_id: UUID) -> bool:
     result = await session.execute(stmt)
     await session.commit()
     return result.rowcount > 0
+
+async def patch_category(
+    session: AsyncSession,
+    category_id: UUID,
+    user_id: UUID,
+    patch_data: dict,
+) -> Optional[Category]:
+    category = await get_category_by_id(session, category_id)
+    if not category or category.user_id != user_id:
+        raise ValueError("Category not found or not owned by user")
+    # Если обновляются name и/или type, проверить уникальность
+    new_name = patch_data.get('name', category.name)
+    new_type = patch_data.get('type', category.type)
+    if (new_name != category.name) or (new_type != category.type):
+        existing = await session.scalar(
+            select(Category).where(
+                Category.user_id == user_id,
+                Category.name == new_name,
+                Category.type == new_type,
+                Category.id != category_id
+            )
+        )
+        if existing:
+            raise ValueError("Category with this name and type already exists")
+    # Применяем только переданные поля
+    for key, value in patch_data.items():
+        setattr(category, key, value)
+    await session.commit()
+    await session.refresh(category)
+    return category

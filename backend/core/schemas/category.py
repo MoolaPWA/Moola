@@ -28,3 +28,11 @@ class CategoryRead(CategoryBase):
     cat_limit: Optional[float]
     id_icon: str
     model_config = {"from_attributes": True}
+
+class CategoryUpdate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    type: Literal['income', 'expense']
+
+class CategoryPatch(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    type: Optional[Literal['income', 'expense']] = None

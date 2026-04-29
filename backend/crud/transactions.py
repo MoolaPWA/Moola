@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
-from typing import Sequence, Optional
+from typing import List, Sequence, Optional
 from uuid import UUID
 from core.models import Transaction, Category
 from core.schemas.transaction import TransactionCreate
@@ -16,10 +18,19 @@ async def get_transactions_by_user(
     limit: int = 100,
     offset: int = 0,
     type_filter: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    category_id: Optional[UUID] = None,
 ) -> Sequence[Transaction]:
     stmt = select(Transaction).where(Transaction.user_id == user_id)
     if type_filter:
         stmt = stmt.where(Transaction.type == type_filter)
+    if start_date:
+        stmt = stmt.where(Transaction.transaction_date >= start_date)
+    if end_date:
+        stmt = stmt.where(Transaction.transaction_date <= end_date)
+    if category_id:
+        stmt = stmt.where(Transaction.category_id == category_id)
     stmt = stmt.order_by(Transaction.transaction_date.desc()).limit(limit).offset(offset)
     result = await session.scalars(stmt)
     return result.all()
@@ -101,3 +112,44 @@ async def delete_transaction(session: AsyncSession, transaction_id: UUID) -> boo
     result = await session.execute(stmt)
     await session.commit()
     return result.rowcount > 0
+
+async def patch_transaction(
+    session: AsyncSession,
+    transaction_id: UUID,
+    user_id: UUID,
+    patch_data: dict,
+) -> Optional[Transaction]:
+    transaction = await get_transaction_by_id(session, transaction_id)
+    if not transaction or transaction.user_id != user_id:
+        raise ValueError("Transaction not found or not owned by user")
+    
+    # Если обновляется category_id, проверить принадлежность и тип
+    if 'category_id' in patch_data and patch_data['category_id'] is not None:
+        cat_id = patch_data['category_id']
+        category = await session.scalar(select(Category).where(Category.id == cat_id))
+        if not category or category.user_id != user_id:
+            raise ValueError("Category not found or not owned by user")
+        # Тип транзакции может быть обновлён одновременно
+        new_type = patch_data.get('type', transaction.type)
+        if category.type != new_type:
+            raise ValueError("Category type does not match transaction type")
+    
+    # Применяем изменения
+    for key, value in patch_data.items():
+        setattr(transaction, key, value)
+    await session.commit()
+    await session.refresh(transaction)
+    return transaction
+
+async def patch_transactions_bulk(
+    session: AsyncSession,
+    user_id: UUID,
+    updates: List[dict],  # каждый элемент: {"id": UUID, **patch_data}
+) -> List[Transaction]:
+    updated_transactions = []
+    for update in updates:
+        tx_id = update.pop('id')
+        tx = await patch_transaction(session, tx_id, user_id, update)
+        if tx:
+            updated_transactions.append(tx)
+    return updated_transactions
