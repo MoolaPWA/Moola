@@ -1,19 +1,69 @@
 importScripts('https://unpkg.com/dexie@3.2.4/dist/dexie.js');
 
+const CACHE_NAME = 'moola-cache-v1';
+
+// Статические ресурсы для кеширования
+const APP_SHELL = [
+    '/',
+    '/index.html',
+    '/logo-192x192.png',
+    '/logo-512x512.png',
+    '/favicon.svg',
+];
+
 const db = new Dexie('MoolaDB');
 
-// Схема должна совпадать с database.ts
-db.version(2).stores({
+db.version(3).stores({
     users: 'id',
-    categories: 'id, user_id',
+    categories: 'id, user_id, is_deleted',
     transactions: 'id, user_id, category_id, transaction_date, is_synced, is_deleted',
 });
 
 const SW_ALLOWED_STORES = ['transactions'];
 
+// Кешируем app shell при установке
+self.addEventListener('install', (event) => {
+    console.log('[SW] Installing...');
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('[SW] Caching app shell');
+            return cache.addAll(APP_SHELL);
+        }).then(() => self.skipWaiting())
+    );
+});
+
+// Удаляем старые кеши при активации
+self.addEventListener('activate', (event) => {
+    console.log('[SW] Activating...');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_NAME)
+                    .map((name) => {
+                        console.log('[SW] Deleting old cache:', name);
+                        return caches.delete(name);
+                    })
+            );
+        }).then(() => self.clients.claim())
+    );
+});
+
+// Отдаём из кеша, если есть — иначе из сети
+self.addEventListener('fetch', (event) => {
+    // API запросы не кешируем
+    if (event.request.url.includes('/api/')) return;
+
+    event.respondWith(
+        caches.match(event.request).then((cached) => {
+            return cached || fetch(event.request);
+        })
+    );
+});
+
+// Сообщения от приложения
 self.addEventListener('message', async (event) => {
     const { type } = event.data;
-
     switch (type) {
         case 'SYNC_REQUEST': {
             await handleSync(event);
@@ -43,8 +93,7 @@ async function handleSync(event) {
 
 async function syncUnsyncedTransactions() {
     const unsynced = await db.transactions
-        .where('is_synced')
-        .equals(0)
+        .where('is_synced').equals(0)
         .toArray();
 
     if (unsynced.length === 0) return 0;
@@ -67,13 +116,3 @@ async function syncUnsyncedTransactions() {
 
     return syncedIds.length;
 }
-
-self.addEventListener('install', (event) => {
-    console.log('[SW] Installed');
-    event.waitUntil(self.skipWaiting());
-});
-
-self.addEventListener('activate', (event) => {
-    console.log('[SW] Activated');
-    event.waitUntil(self.clients.claim());
-});

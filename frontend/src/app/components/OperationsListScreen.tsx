@@ -31,7 +31,9 @@ export function OperationsListScreen() {
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
   // Фильтры
-  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [filterPeriod, setFilterPeriod] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
+  const [filterDateTo, setFilterDateTo] = useState<string>("");
 
   // Диалог категорий
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -87,22 +89,45 @@ export function OperationsListScreen() {
 
   // Фильтрация операций
   const filteredOperations = useMemo(() => {
-    return operations.filter((op) => {
-      const matchesSearch = op.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesType = filterType === "all" || op.type === filterType;
-      const matchesCategory = filterCategory === "all" || op.category_id === filterCategory;
-      const matchesMonth = filterMonth === "all" || op.transaction_date.startsWith(filterMonth);
-      return matchesSearch && matchesType && matchesCategory && matchesMonth;
-    });
-  }, [operations, searchQuery, filterType, filterCategory, filterMonth]);
+    const now = new Date();
 
-  // Добавить после объявления filteredOperations
-  const availableMonths = useMemo(() => {
-    const months = new Set(
-        operations.map((op) => op.transaction_date.slice(0, 7)) // "2026-03"
-    );
-    return Array.from(months).sort((a, b) => b.localeCompare(a)); // новые сверху
-  }, [operations]);
+    // Вычисляем from/to по пресету
+    let periodFrom = "";
+    let periodTo = "";
+
+    if (filterPeriod === "day") {
+      periodFrom = now.toISOString().split('T')[0];
+      periodTo = periodFrom;
+    } else if (filterPeriod === "week") {
+      const from = new Date();
+      from.setDate(from.getDate() - 6);
+      periodFrom = from.toISOString().split('T')[0];
+      periodTo = now.toISOString().split('T')[0];
+    } else if (filterPeriod === "month") {
+      periodFrom = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString().split('T')[0];
+      periodTo = now.toISOString().split('T')[0];
+    } else if (filterPeriod === "custom") {
+      periodFrom = filterDateFrom;
+      periodTo = filterDateTo;
+    }
+
+    return operations.filter((op) => {
+      const matchesSearch = op.description
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+      const matchesType = filterType === "all" || op.type === filterType;
+      const matchesCategory =
+          filterCategory === "all" || op.category_id === filterCategory;
+
+      let matchesPeriod = true;
+      if (periodFrom) matchesPeriod = op.transaction_date >= periodFrom;
+      if (periodTo) matchesPeriod = matchesPeriod && op.transaction_date <= periodTo;
+
+      return matchesSearch && matchesType && matchesCategory && matchesPeriod;
+    });
+  }, [operations, searchQuery, filterType, filterCategory, filterPeriod, filterDateFrom, filterDateTo]);
+
 
   // Диалог категории
   const handleOpenCategoryDialog = (category?: Category) => {
@@ -226,9 +251,17 @@ export function OperationsListScreen() {
                   placeholder="Поиск операций..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 py-6 rounded-xl bg-[#e8f5e9] border-0 text-green-900 placeholder:text-green-600"
+                  className="pl-12 pr-12 py-6 rounded-xl bg-[#e8f5e9] border-0 text-green-900 placeholder:text-green-600"
                   style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
               />
+              {searchQuery && (
+                  <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600 hover:text-green-900"
+                  >
+                    ✕
+                  </button>
+              )}
             </div>
           </div>
         </div>
@@ -247,14 +280,14 @@ export function OperationsListScreen() {
             <TabsContent value="operations" className="space-y-4 mt-6">
               {/* Filters */}
               <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-raised)' }}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-green-700" />
                     <span className="text-sm font-medium text-green-900">Фильтры</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
-                    {/* Фильтр по типу — без изменений */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Тип */}
                     <Select value={filterType} onValueChange={setFilterType}>
                       <SelectTrigger className="rounded-xl border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
                         <SelectValue />
@@ -266,7 +299,7 @@ export function OperationsListScreen() {
                       </SelectContent>
                     </Select>
 
-                    {/* Фильтр по категории — без изменений */}
+                    {/* Категория */}
                     <Select value={filterCategory} onValueChange={setFilterCategory}>
                       <SelectTrigger className="rounded-xl border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
                         <SelectValue />
@@ -279,23 +312,70 @@ export function OperationsListScreen() {
                       </SelectContent>
                     </Select>
 
-                    {/* Фильтр по месяцу — новый */}
-                    <Select value={filterMonth} onValueChange={setFilterMonth}>
+                    {/* Период */}
+                    <Select value={filterPeriod} onValueChange={(v) => {
+                      setFilterPeriod(v);
+                      if (v !== "custom") {
+                        setFilterDateFrom("");
+                        setFilterDateTo("");
+                      }
+                    }}>
                       <SelectTrigger className="rounded-xl border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
-                        <SelectValue placeholder="Все месяцы" />
+                        <SelectValue placeholder="Все периоды" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Все месяцы</SelectItem>
-                        {availableMonths.map((month) => (
-                            <SelectItem key={month} value={month}>
-                              {new Date(month + "-01").toLocaleDateString('ru-RU', {
-                                month: 'long', year: 'numeric'
-                              })}
-                            </SelectItem>
-                        ))}
+                        <SelectItem value="all">Все периоды</SelectItem>
+                        <SelectItem value="day">За день</SelectItem>
+                        <SelectItem value="week">За неделю</SelectItem>
+                        <SelectItem value="month">За месяц</SelectItem>
+                        <SelectItem value="custom">За период</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Date picker — только для произвольного периода */}
+                  {filterPeriod === "custom" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <span className="text-xs text-green-700">От</span>
+                          <Input
+                              type="date"
+                              value={filterDateFrom}
+                              onChange={(e) => setFilterDateFrom(e.target.value)}
+                              className="rounded-xl border-0 bg-[#e8f5e9] text-green-900"
+                              style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs text-green-700">До</span>
+                          <Input
+                              type="date"
+                              value={filterDateTo}
+                              onChange={(e) => setFilterDateTo(e.target.value)}
+                              className="rounded-xl border-0 bg-[#e8f5e9] text-green-900"
+                              style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+                          />
+                        </div>
+                      </div>
+                  )}
+
+                  {/* Сброс фильтров */}
+                  {(filterType !== "all" || filterCategory !== "all" || filterPeriod !== "all" || searchQuery) && (
+                      <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setFilterType("all");
+                            setFilterCategory("all");
+                            setFilterPeriod("all");
+                            setFilterDateFrom("");
+                            setFilterDateTo("");
+                            setSearchQuery("");
+                          }}
+                          className="w-full text-green-700 hover:text-green-900 text-sm rounded-xl"
+                      >
+                        Сбросить все фильтры
+                      </Button>
+                  )}
                 </CardContent>
               </Card>
 

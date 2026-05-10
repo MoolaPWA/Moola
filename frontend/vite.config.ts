@@ -11,23 +11,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate', // Автоматически обновляет service worker
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
-      manifest: {
-        name: 'Moola',
-        description: 'Управление личными финансами',
-        theme_color: '#ffffff',
-        icons: [
-          {
-            src: 'logo-256x256.png',
-            sizes: '256x256',
-            type: 'image/png'
-          },
-          {
-            src: 'logo-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
     }),
   ],
   server: {

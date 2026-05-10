@@ -9,6 +9,36 @@ import type { Transaction } from "@/db/database";
 const TEMP_USER_ID = "temp-user-1";
 
 export function DashboardScreen() {
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+
+  useEffect(() => {
+    // Если событие уже было — берём сразу
+    if (window.__installPrompt) {
+      setInstallPrompt(window.__installPrompt);
+      setShowInstallButton(true);
+      return;
+    }
+
+    // Иначе ждём
+    const handler = () => {
+      setInstallPrompt(window.__installPrompt);
+      setShowInstallButton(true);
+    };
+
+    window.addEventListener('installpromptready', handler);
+    return () => window.removeEventListener('installpromptready', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result.outcome === 'accepted') {
+      setShowInstallButton(false);
+    }
+  };
+
   const navigate = useNavigate();
   const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +150,16 @@ export function DashboardScreen() {
             <BarChart3 className="w-6 h-6" />
             Статистика
           </Button>
+
+          {showInstallButton && (
+              <Button
+                  onClick={handleInstall}
+                  className="w-full border-0 bg-green-600 text-white hover:bg-green-700 py-8 rounded-2xl flex items-center justify-center gap-3 text-lg"
+                  style={{ boxShadow: 'var(--shadow-neu-raised)' }}
+              >
+                📲 Установить приложение
+              </Button>
+          )}
 
           {/* Quick Stats — без изменений */}
           <div className="grid grid-cols-2 gap-4">
