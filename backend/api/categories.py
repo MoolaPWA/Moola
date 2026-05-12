@@ -24,7 +24,9 @@ async def create_category_endpoint(
             name=category_data.name,
             type=category_data.type,
             cat_limit=None,
-            id_icon="default_icon"
+            icon_path=category_data.icon_path,
+            background_color=category_data.background_color,
+            icon_color=category_data.icon_color
         )
         return await create_category(session, create_data)
 

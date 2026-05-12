@@ -6,14 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
 from core.schemas.transaction import BulkTransactionPatch, TransactionCreate, TransactionPatch, TransactionRead, TransactionUpdate, TransactionSyncRequest
-from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id, soft_delete_transaction, patch_transaction as crud_patch_transaction, patch_transactions_bulk as crud_patch_transactions_bulk, sync_transactions_bulk
+from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id, soft_delete_transaction, patch_transaction as crud_patch_transaction, patch_transactions_bulk as sync_transactions_bulk, sync_transactions_bulk
 from core.auth import get_current_user
 from core.models import User
-from slowapi import Limiter
+from core.limiter import limiter
 from fastapi import Request
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
-limiter = Limiter(key_func=lambda request: request.state.user_id)
 
 @router.post("/sync", response_model=list[TransactionRead])
 @limiter.limit("10/minute")
@@ -23,7 +22,7 @@ async def sync_transactions(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
 ):
-    return await crud_patch_transactions_bulk(session, current_user.id, sync_data.items)
+    return await sync_transactions_bulk(session, current_user.id, sync_data.items)
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
 async def create_transaction_endpoint(
@@ -88,7 +87,7 @@ async def patch_transactions_bulk_endpoint(
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
     try:
-        updated = await crud_patch_transactions_bulk(
+        updated = await sync_transactions_bulk(
             session, current_user.id, updates
         )
         return updated
