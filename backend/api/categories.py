@@ -50,7 +50,7 @@ async def create_category_endpoint(
 async def list_categories(
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
-    type_filter: Optional[str] = Query(None, regex="^(income|expense)$"),
+    type_filter: Optional[str] = Query(None, pattern="^(income|expense)$"),
 ):
     return await get_categories_by_user(session, current_user.id, type_filter=type_filter)
 

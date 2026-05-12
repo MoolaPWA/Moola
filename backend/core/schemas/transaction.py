@@ -50,5 +50,25 @@ class TransactionPatchItem(BaseModel):
     description: Optional[str] = Field(None, max_length=255)
     category_id: Optional[UUID] = None
 
+class TransactionSyncItem(BaseModel):
+    id: UUID
+    updated_at: datetime
+    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    type: Literal['income', 'expense']
+    date: datetime
+    description: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[UUID] = None
+    is_deleted: bool
+    is_synced: bool
+
+    @field_validator('date')
+    def not_future(cls, v):
+        if v > datetime.now().astimezone(v.tzinfo):
+            raise ValueError('date cannot be in the future')
+        return v
+    
+class TransactionSyncRequest(BaseModel):
+    items: List[TransactionSyncItem] = Field(..., max_items=1000)
+
 class BulkTransactionPatch(BaseModel):
     updates: List[TransactionPatchItem]

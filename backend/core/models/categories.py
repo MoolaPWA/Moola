@@ -18,7 +18,6 @@ class Category(Base):
     name = Column(String(100), nullable=False)
     type = Column(Enum(TransactionType), nullable=False)
     cat_limit = Column(Numeric(10, 2), nullable=True)
-    id_icon = Column(String, default="default_icon")
     is_deleted = Column(Boolean, server_default="false", nullable=False)
 
     user = relationship("User", back_populates="categories")

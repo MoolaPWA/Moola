@@ -47,7 +47,9 @@ async def create_category(session: AsyncSession, category_data: CategoryCreate) 
         name=name,
         type=cat_type,
         cat_limit=category_data.cat_limit,
-        id_icon=category_data.id_icon
+        icon_path=category_data.icon_path,
+        background_color=category_data.background_color,
+        icon_color=category_data.icon_color
     )
     session.add(new_category)
     await session.commit()

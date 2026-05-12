@@ -1,11 +1,14 @@
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 from typing import List, Sequence, Optional
 from uuid import UUID
 from core.models import Transaction, Category
 from core.schemas.transaction import TransactionCreate
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def get_transaction_by_id(session: AsyncSession, transaction_id: UUID, include_deleted: bool = False) -> Optional[Transaction]:
     stmt = select(Transaction).where(Transaction.id == transaction_id)
@@ -60,14 +63,13 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc)
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            stmt = select(Transaction).where(
+            total_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 Transaction.user_id == user_id,
                 Transaction.category_id == category_id,
                 Transaction.transaction_date >= start_of_month,
                 Transaction.is_deleted == False
             )
-            result = await session.scalars(stmt)
-            total_spent = sum(t.amount for t in result) if result else 0
+            total_spent = await session.scalar(total_stmt)
             if total_spent + transaction_data.amount > category.cat_limit:
                 raise ValueError(f"Exceeds category limit of {category.cat_limit}")
 
@@ -172,3 +174,43 @@ async def patch_transactions_bulk(
         if tx:
             updated_transactions.append(tx)
     return updated_transactions
+
+async def sync_transactions_bulk(session: AsyncSession, user_id: UUID, items: list) -> list[Transaction]:
+    updated = []
+    for item in items:
+        try:
+            tx = await session.get(Transaction, item.id)
+            if tx:
+                if tx.user_id != user_id:
+                    logger.warning(f"Sync: transaction {item.id} belongs to user {tx.user_id}, skipping")
+                    continue
+                # Сравниваем updated_at
+                if item.updated_at <= tx.updated_at:
+                    logger.info(f"Sync: transaction {item.id} skipped (server is newer or equal)")
+                    continue
+            # Создание или обновление
+            new_values = {
+                "user_id": user_id,
+                "amount": item.amount,
+                "type": item.type,
+                "transaction_date": item.date,
+                "description": item.description,
+                "category_id": item.category_id,
+                "is_deleted": item.is_deleted,
+                "is_synced": item.is_synced,
+            }
+            if tx is None:
+                tx = Transaction(id=item.id, **new_values)
+                session.add(tx)
+            else:
+                for k, v in new_values.items():
+                    setattr(tx, k, v)
+            tx.updated_at = item.updated_at   # важно: сохраняем клиентское время
+            updated.append(tx)
+        except Exception as e:
+            logger.error(f"Sync: error processing transaction {item.id}: {e}", exc_info=True)
+            continue
+    await session.commit()
+    for t in updated:
+        await session.refresh(t)
+    return updated

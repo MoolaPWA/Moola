@@ -5,12 +5,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
-from core.schemas.transaction import BulkTransactionPatch, TransactionCreate, TransactionPatch, TransactionRead, TransactionUpdate
-from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id, soft_delete_transaction, patch_transaction as crud_patch_transaction, patch_transactions_bulk as crud_patch_transactions_bulk
+from core.schemas.transaction import BulkTransactionPatch, TransactionCreate, TransactionPatch, TransactionRead, TransactionUpdate, TransactionSyncRequest
+from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id, soft_delete_transaction, patch_transaction as crud_patch_transaction, patch_transactions_bulk as crud_patch_transactions_bulk, sync_transactions_bulk
 from core.auth import get_current_user
 from core.models import User
+from slowapi import Limiter
+from fastapi import Request
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+limiter = Limiter(key_func=lambda request: request.state.user_id)
+
+@router.post("/sync", response_model=list[TransactionRead])
+@limiter.limit("10/minute")
+async def sync_transactions(
+    request: Request,
+    sync_data: TransactionSyncRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    return await crud_patch_transactions_bulk(session, current_user.id, sync_data.items)
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
 async def create_transaction_endpoint(
@@ -42,7 +55,7 @@ async def list_transactions(
     current_user: User = Depends(get_current_user),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    type_filter: Optional[str] = Query(None, regex="^(income|expense)$"),
+    type_filter: Optional[str] = Query(None, pattern="^(income|expense)$"),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     category_id: Optional[UUID] = Query(None),

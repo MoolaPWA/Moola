@@ -19,6 +19,7 @@ class Transaction(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_synced = Column(Boolean, server_default="false", nullable=False)
     is_deleted = Column(Boolean, server_default="false", nullable=False)
 
     user = relationship("User", back_populates="transactions")

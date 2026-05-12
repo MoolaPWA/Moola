@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 from datetime import datetime, timezone
 from uuid import UUID
+import logging
 
 from core import db_helper
 from core.models import User, RefreshToken
@@ -20,7 +21,12 @@ from core.auth import (
 from crud.users import get_user_by_email, create_user
 from core.schemas.auth import UserRegister, UserLogin, TokenResponse, RefreshRequest
 
+from core.limiter import limiter
+from fastapi import Request
+from slowapi.util import get_remote_address
+
 router = APIRouter(prefix="/auth", tags=["Auth"])
+logger = logging.getLogger(__name__)
 
 
 async def _revoke_all_user_refresh_tokens(session: AsyncSession, user_id: UUID) -> None:
@@ -43,9 +49,10 @@ async def _create_token_pair(
     await create_refresh_token_in_db(session, user_id, refresh_token)
     return access_token, refresh_token
 
-
 @router.post("/register", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     user_data: UserRegister,
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
@@ -80,7 +87,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     login_data: UserLogin,
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
@@ -105,7 +114,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def refresh(
+    request: Request,
     refresh_data: RefreshRequest,
     session: AsyncSession = Depends(db_helper.session_getter),
 ):

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Request
 
 from core.config import settings
 from core.db_helper import db_helper
@@ -30,14 +31,14 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.token.access_token_expire_minutes))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.token.access_token_expire_minutes))
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, settings.token.secret_key, algorithm=settings.token.algorithm)
 
 
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.token.refresh_token_expire_days)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.token.refresh_token_expire_days)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.token.secret_key, algorithm=settings.token.algorithm)
 
@@ -50,6 +51,7 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     session: AsyncSession = Depends(db_helper.session_getter),
 ) -> User:
@@ -65,7 +67,9 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    request.state.user_id = user.id   # <-- записываем
     return user
+
 
 
 async def create_refresh_token_in_db(session: AsyncSession, user_id: UUID, token: str) -> RefreshToken:
@@ -86,7 +90,7 @@ async def get_refresh_token(session: AsyncSession, token: str) -> RefreshToken |
         select(RefreshToken).where(
             RefreshToken.token == token,
             RefreshToken.revoked.is_(None),
-            RefreshToken.expires_at > datetime.utcnow()
+            RefreshToken.expires_at > datetime.now(timezone.utc)
         )
     )
     return result.scalar_one_or_none()
