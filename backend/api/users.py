@@ -1,7 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from crud.users import get_all_users
-from crud.users import update_user
+from crud.users import get_all_users, update_user, soft_delete_user, get_user_by_id, patch_user as crud_patch_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
 from core.schemas.user import UserPatch, UserRead, UserUpdate
@@ -26,7 +25,7 @@ async def get_users(
 
 
 @router.put("/{user_id}", response_model=UserRead)
-async def update_user(
+async def update_user_endpoint(
     user_id: UUID,
     user_data: UserUpdate,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -44,7 +43,7 @@ async def update_user(
     return updated
 
 @router.patch("/{user_id}", response_model=UserRead)
-async def patch_user(
+async def patch_user_endpoint(
     user_id: UUID,
     patch_data: UserPatch,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -59,9 +58,33 @@ async def patch_user(
     if 'password' in data:
         data['hashed_password'] = get_password_hash(data.pop('password'))
     try:
-        updated = await patch_user(session, user_id, data)
+        updated = await crud_patch_user(session, user_id, data)
         if not updated:
             raise HTTPException(status_code=404, detail="User not found")
         return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(
+    user_id: UUID,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    # Только пользователь может удалить свой профиль
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Проверяем, что пользователь существует и не удален
+    user = await get_user_by_id(session, user_id, include_deleted=False)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        result = await soft_delete_user(session, user_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="User already deleted")
+        return {"detail": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+

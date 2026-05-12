@@ -5,8 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
-from core.schemas.transaction import BulkTransactionPatch, TransactionCreate, TransactionPatch, TransactionRead, TransactionUpdate, TransactionUpdate
-from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id
+from core.schemas.transaction import BulkTransactionPatch, TransactionCreate, TransactionPatch, TransactionRead, TransactionUpdate
+from crud.transactions import create_transaction, get_transactions_by_user, update_transaction, get_transaction_by_id, soft_delete_transaction, patch_transaction as crud_patch_transaction, patch_transactions_bulk as crud_patch_transactions_bulk
 from core.auth import get_current_user
 from core.models import User
 
@@ -56,7 +56,32 @@ async def list_transactions(
         category_id=category_id
     )
 
-# api/transactions.py
+@router.patch("/bulk", response_model=list[TransactionRead])
+async def patch_transactions_bulk_endpoint(
+    bulk_data: BulkTransactionPatch,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Пример тела запроса:
+    {
+        "updates": [
+            {"id": "uuid1", "amount": 1500.00, "description": "new desc"},
+            {"id": "uuid2", "category_id": "uuid_cat", "type": "expense"}
+        ]
+    }
+    """
+    updates = bulk_data.updates
+    if not updates:
+        raise HTTPException(status_code=400, detail="No updates provided")
+    try:
+        updated = await crud_patch_transactions_bulk(
+            session, current_user.id, updates
+        )
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.put("/{transaction_id}", response_model=TransactionRead)
 async def update_transaction_endpoint(
     transaction_id: UUID,
@@ -81,10 +106,9 @@ async def update_transaction_endpoint(
         return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
-# api/transactions.py
+
 @router.patch("/{transaction_id}", response_model=TransactionRead)
-async def patch_transaction(
+async def patch_transaction_endpoint(
     transaction_id: UUID,
     patch_data: TransactionPatch,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -94,7 +118,7 @@ async def patch_transaction(
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
-        updated = await patch_transaction(
+        updated = await crud_patch_transaction(
             session, transaction_id, current_user.id, data
         )
         if not updated:
@@ -103,28 +127,25 @@ async def patch_transaction(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.patch("/bulk", response_model=list[TransactionRead])
-async def patch_transactions_bulk(
-    bulk_data: BulkTransactionPatch,
+@router.delete("/{transaction_id}", status_code=status.HTTP_200_OK)
+async def delete_transaction_endpoint(
+    transaction_id: UUID,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Пример тела запроса:
-    {
-        "updates": [
-            {"id": "uuid1", "amount": 1500.00, "description": "new desc"},
-            {"id": "uuid2", "category_id": "uuid_cat", "type": "expense"}
-        ]
-    }
-    """
-    updates = bulk_data.updates
-    if not updates:
-        raise HTTPException(status_code=400, detail="No updates provided")
+    # Проверяем, что транзакция существует и принадлежит пользователю
+    transaction = await get_transaction_by_id(session, transaction_id, include_deleted=False)
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if transaction.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your transaction")
+    
     try:
-        updated = await patch_transactions_bulk(
-            session, current_user.id, updates
-        )
-        return updated
+        result = await soft_delete_transaction(session, transaction_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="Transaction already deleted")
+        return {"detail": "deleted"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+
+

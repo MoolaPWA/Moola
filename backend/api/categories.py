@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
 from core.schemas.category import CategoryCreateRequest, CategoryPatch, CategoryRead, CategoryCreate, CategoryUpdate
-from crud.categories import create_category, get_categories_by_user, update_category
+from crud.categories import create_category, get_categories_by_user, update_category, get_category_by_id, soft_delete_category, patch_category as crud_patch_category
 from core.auth import get_current_user
 from core.models import User
 
@@ -73,7 +73,7 @@ async def update_category_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/{category_id}", response_model=CategoryRead)
-async def patch_category(
+async def patch_category_endpoint(
     category_id: UUID,
     patch_data: CategoryPatch,
     session: AsyncSession = Depends(db_helper.session_getter),
@@ -83,7 +83,7 @@ async def patch_category(
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
-        updated = await patch_category(
+        updated = await crud_patch_category(
             session, category_id, current_user.id, data
         )
         if not updated:
@@ -91,3 +91,25 @@ async def patch_category(
         return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/{category_id}", status_code=status.HTTP_200_OK)
+async def delete_category_endpoint(
+    category_id: UUID,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    # Проверяем, что категория существует и принадлежит пользователю
+    category = await get_category_by_id(session, category_id, include_deleted=False)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if category.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your category")
+    
+    try:
+        result = await soft_delete_category(session, category_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="Category already deleted")
+        return {"detail": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+

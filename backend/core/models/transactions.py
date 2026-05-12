@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Enum, Text, Index, UniqueConstraint
+from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Enum, Text, Index, UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -19,6 +19,7 @@ class Transaction(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_deleted = Column(Boolean, server_default="false", nullable=False)
 
     user = relationship("User", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")

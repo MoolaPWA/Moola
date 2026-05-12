@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, ForeignKey, Enum, Index, UniqueConstraint
+from sqlalchemy import Column, String, Numeric, ForeignKey, Enum, Index, UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -19,6 +19,7 @@ class Category(Base):
     type = Column(Enum(TransactionType), nullable=False)
     cat_limit = Column(Numeric(10, 2), nullable=True)
     id_icon = Column(String, default="default_icon")
+    is_deleted = Column(Boolean, server_default="false", nullable=False)
 
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")

@@ -7,8 +7,10 @@ from uuid import UUID
 from core.models import Transaction, Category
 from core.schemas.transaction import TransactionCreate
 
-async def get_transaction_by_id(session: AsyncSession, transaction_id: UUID) -> Optional[Transaction]:
+async def get_transaction_by_id(session: AsyncSession, transaction_id: UUID, include_deleted: bool = False) -> Optional[Transaction]:
     stmt = select(Transaction).where(Transaction.id == transaction_id)
+    if not include_deleted:
+        stmt = stmt.where(Transaction.is_deleted == False)
     result = await session.scalar(stmt)
     return result
 
@@ -21,8 +23,11 @@ async def get_transactions_by_user(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     category_id: Optional[UUID] = None,
+    include_deleted: bool = False,
 ) -> Sequence[Transaction]:
     stmt = select(Transaction).where(Transaction.user_id == user_id)
+    if not include_deleted:
+        stmt = stmt.where(Transaction.is_deleted == False)
     if type_filter:
         stmt = stmt.where(Transaction.type == type_filter)
     if start_date:
@@ -41,7 +46,7 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
 
     # Валидация: если категория указана, проверить её принадлежность пользователю и соответствие типа
     if category_id:
-        category = await session.scalar(select(Category).where(Category.id == category_id))
+        category = await session.scalar(select(Category).where(Category.id == category_id, Category.is_deleted == False))
         if not category:
             raise ValueError(f"Category with id '{category_id}' not found")
         if category.user_id != user_id:
@@ -58,7 +63,8 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
             stmt = select(Transaction).where(
                 Transaction.user_id == user_id,
                 Transaction.category_id == category_id,
-                Transaction.transaction_date >= start_of_month
+                Transaction.transaction_date >= start_of_month,
+                Transaction.is_deleted == False
             )
             result = await session.scalars(stmt)
             total_spent = sum(t.amount for t in result) if result else 0
@@ -91,7 +97,7 @@ async def update_transaction(
     if 'category_id' in kwargs:
         new_cat_id = kwargs['category_id']
         if new_cat_id:
-            category = await session.scalar(select(Category).where(Category.id == new_cat_id))
+            category = await session.scalar(select(Category).where(Category.id == new_cat_id, Category.is_deleted == False))
             if not category:
                 raise ValueError(f"Category not found: {new_cat_id}")
             if category.user_id != existing.user_id:
@@ -106,6 +112,19 @@ async def update_transaction(
     result = await session.execute(stmt)
     await session.commit()
     return result.scalar_one_or_none()
+
+async def soft_delete_transaction(session: AsyncSession, transaction_id: UUID) -> bool:
+    """Perform soft delete on transaction - sets is_deleted=True and updates updated_at"""
+    transaction = await get_transaction_by_id(session, transaction_id, include_deleted=False)
+    if not transaction:
+        return False
+    if transaction.is_deleted:
+        raise ValueError("Transaction is already deleted")
+    
+    stmt = update(Transaction).where(Transaction.id == transaction_id).values(is_deleted=True).returning(Transaction)
+    result = await session.execute(stmt)
+    await session.commit()
+    return result.rowcount > 0
 
 async def delete_transaction(session: AsyncSession, transaction_id: UUID) -> bool:
     stmt = delete(Transaction).where(Transaction.id == transaction_id)
@@ -126,7 +145,7 @@ async def patch_transaction(
     # Если обновляется category_id, проверить принадлежность и тип
     if 'category_id' in patch_data and patch_data['category_id'] is not None:
         cat_id = patch_data['category_id']
-        category = await session.scalar(select(Category).where(Category.id == cat_id))
+        category = await session.scalar(select(Category).where(Category.id == cat_id, Category.is_deleted == False))
         if not category or category.user_id != user_id:
             raise ValueError("Category not found or not owned by user")
         # Тип транзакции может быть обновлён одновременно

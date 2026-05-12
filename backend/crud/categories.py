@@ -5,8 +5,10 @@ from uuid import UUID
 from core.models import Category
 from core.schemas.category import CategoryCreate
 
-async def get_category_by_id(session: AsyncSession, category_id: UUID) -> Optional[Category]:
+async def get_category_by_id(session: AsyncSession, category_id: UUID, include_deleted: bool = False) -> Optional[Category]:
     stmt = select(Category).where(Category.id == category_id)
+    if not include_deleted:
+        stmt = stmt.where(Category.is_deleted == False)
     result = await session.scalar(stmt)
     return result
 
@@ -14,8 +16,11 @@ async def get_categories_by_user(
     session: AsyncSession,
     user_id: UUID,
     type_filter: Optional[str] = None,
+    include_deleted: bool = False,
 ) -> Sequence[Category]:
     stmt = select(Category).where(Category.user_id == user_id)
+    if not include_deleted:
+        stmt = stmt.where(Category.is_deleted == False)
     if type_filter:
         stmt = stmt.where(Category.type == type_filter)
     stmt = stmt.order_by(Category.name)
@@ -31,7 +36,8 @@ async def create_category(session: AsyncSession, category_data: CategoryCreate) 
     existing = await session.scalar(select(Category).where(
         Category.user_id == user_id,
         Category.name == name,
-        Category.type == cat_type
+        Category.type == cat_type,
+        Category.is_deleted == False
     ))
     if existing:
         raise ValueError(f"Category '{name}' of type '{cat_type}' already exists for this user")
@@ -63,7 +69,8 @@ async def update_category(
             Category.user_id == user_id,
             Category.name == name,
             Category.type == type,
-            Category.id != category_id
+            Category.id != category_id,
+            Category.is_deleted == False
         )
     )
     if existing:
@@ -73,6 +80,19 @@ async def update_category(
     await session.commit()
     await session.refresh(category)
     return category
+
+async def soft_delete_category(session: AsyncSession, category_id: UUID) -> bool:
+    """Perform soft delete on category - sets is_deleted=True and updates updated_at"""
+    category = await get_category_by_id(session, category_id, include_deleted=False)
+    if not category:
+        return False
+    if category.is_deleted:
+        raise ValueError("Category is already deleted")
+    
+    stmt = update(Category).where(Category.id == category_id).values(is_deleted=True).returning(Category)
+    result = await session.execute(stmt)
+    await session.commit()
+    return result.rowcount > 0
 
 async def delete_category(session: AsyncSession, category_id: UUID) -> bool:
     category = await get_category_by_id(session, category_id)
@@ -102,7 +122,8 @@ async def patch_category(
                 Category.user_id == user_id,
                 Category.name == new_name,
                 Category.type == new_type,
-                Category.id != category_id
+                Category.id != category_id,
+                Category.is_deleted == False
             )
         )
         if existing:

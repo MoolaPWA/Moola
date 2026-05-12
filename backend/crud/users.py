@@ -4,24 +4,30 @@ from typing import Sequence, Optional
 from uuid import UUID
 from core.models import User
 
-async def get_all_users(session: AsyncSession) -> Sequence[User]:
+async def get_all_users(session: AsyncSession, include_deleted: bool = False) -> Sequence[User]:
     stmt = select(User)
+    if not include_deleted:
+        stmt = stmt.where(User.is_deleted == False)
     result = await session.scalars(stmt)
     return result.all()
 
-async def get_user_by_id(session: AsyncSession, user_id: UUID) -> Optional[User]:
+async def get_user_by_id(session: AsyncSession, user_id: UUID, include_deleted: bool = False) -> Optional[User]:
     stmt = select(User).where(User.id == user_id)
+    if not include_deleted:
+        stmt = stmt.where(User.is_deleted == False)
     result = await session.scalar(stmt)
     return result
 
-async def get_user_by_email(session: AsyncSession, email: str) -> Optional[User]:
+async def get_user_by_email(session: AsyncSession, email: str, include_deleted: bool = False) -> Optional[User]:
     stmt = select(User).where(User.email == email)
+    if not include_deleted:
+        stmt = stmt.where(User.is_deleted == False)
     result = await session.scalar(stmt)
     return result
 
 async def create_user(session: AsyncSession, name: str, email: str, hashed_password: str) -> User:
     # Валидация: проверяем, нет ли пользователя с таким email
-    existing = await get_user_by_email(session, email)
+    existing = await get_user_by_email(session, email, include_deleted=False)
     if existing:
         raise ValueError(f"User with email '{email}' already exists")
 
@@ -47,6 +53,19 @@ async def update_user(
     result = await session.execute(stmt)
     await session.commit()
     return result.scalar_one_or_none()
+
+async def soft_delete_user(session: AsyncSession, user_id: UUID) -> bool:
+    """Perform soft delete on user - sets is_deleted=True and updates updated_at"""
+    user = await get_user_by_id(session, user_id, include_deleted=False)
+    if not user:
+        return False
+    if user.is_deleted:
+        raise ValueError("User is already deleted")
+    
+    stmt = update(User).where(User.id == user_id).values(is_deleted=True).returning(User)
+    result = await session.execute(stmt)
+    await session.commit()
+    return result.rowcount > 0
 
 async def delete_user(session: AsyncSession, user_id: UUID) -> bool:
     stmt = delete(User).where(User.id == user_id)
