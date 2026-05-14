@@ -9,19 +9,11 @@ from core.models import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.get("", response_model=list[UserRead])
-async def get_users(
-    session: AsyncSession = Depends(db_helper.session_getter),
+@router.get("/me", response_model=UserRead)
+async def get_me(
     current_user: User = Depends(get_current_user),
 ):
-    try:
-        users = await get_all_users(session=session)
-        return users
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve users"
-        )
+    return current_user
 
 
 @router.put("/{user_id}", response_model=UserRead)
@@ -87,4 +79,3 @@ async def delete_user(
         return {"detail": "deleted"}
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-

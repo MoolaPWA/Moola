@@ -23,6 +23,10 @@ class Category(Base):
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
 
+    icon_path = Column(String(255), nullable=False, default="default_icon")
+    background_color = Column(String(7), nullable=False, default="#FFFFFF")
+    icon_color = Column(String(7), nullable=False, default="#000000")
+    
     __table_args__ = (
         Index("idx_categories_user_id", "user_id"),
         UniqueConstraint("user_id", "name", "type", name="categories_user_id_name_type_key"),

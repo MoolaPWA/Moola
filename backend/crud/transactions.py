@@ -79,7 +79,8 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
         amount=transaction_data.amount,
         type=transaction_data.type,
         transaction_date=transaction_data.transaction_date,
-        description=transaction_data.description
+        description=transaction_data.description,
+        is_synced=False
     )
     session.add(new_transaction)
     await session.commit()

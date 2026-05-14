@@ -36,8 +36,8 @@ class CategoryBase(BaseModel):
             raise ValueError('icon_path не должен содержать .. или начинаться с /')
         if not re.match(r'^[a-zA-Z0-9_/]+\.svg$', v):
             raise ValueError('icon_path должен соответствовать шаблону')
-        if v not in ALLOWED_ICONS:
-            raise ValueError(f'Недопустимое значение icon_path: {v}')
+        # if v not in ALLOWED_ICONS:
+        #     raise ValueError(f'Недопустимое значение icon_path: {v}')
         return v
 
 class CategoryCreateRequest(CategoryBase):
