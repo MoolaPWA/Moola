@@ -1,4 +1,5 @@
 import { db, type Category } from '../database';
+import { generateUUID } from '../utils/uuid';
 
 export const categoryService = {
 
@@ -6,14 +7,26 @@ export const categoryService = {
         return db.categories.get(id);
     },
 
+    // Возвращаем только не удалённые
     async getAllByUser(user_id: string): Promise<Category[]> {
-        return db.categories.where('user_id').equals(user_id).toArray();
+        const userCategories = await db.categories
+            .where('user_id').equals(user_id)
+            .filter((c) => c.is_deleted === 0)
+            .toArray();
+
+        const systemCategories = await db.categories
+            .where('user_id').equals('system')
+            .filter((c) => c.is_deleted === 0)
+            .toArray();
+
+        return [...systemCategories, ...userCategories];
     },
 
     async create(data: Omit<Category, 'id'>): Promise<string> {
         const category: Category = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             ...data,
+            is_deleted: 0,
         };
         await db.categories.add(category);
         return category.id;
@@ -23,7 +36,15 @@ export const categoryService = {
         await db.categories.update(id, data);
     },
 
-    async delete(id: string): Promise<void> {
+    // Мягкое удаление (помечаем, не удаляем)
+    async softDelete(id: string): Promise<void> {
+        await db.categories.update(id, {
+            is_deleted: 1,
+        });
+    },
+
+    // Жёсткое удаление (только после синхронизации с сервером)
+    async hardDelete(id: string): Promise<void> {
         await db.categories.delete(id);
     },
 
