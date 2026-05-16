@@ -1,20 +1,81 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from crud.users import get_all_users
+from crud.users import get_all_users, update_user, soft_delete_user, get_user_by_id, patch_user as crud_patch_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
-from core.schemas.user import UserRead
-from core.auth import get_current_user
+from core.schemas.user import UserPatch, UserRead, UserUpdate
+from core.auth import get_current_user, get_password_hash
 from core.models import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.get("", response_model=list[UserRead])
-async def get_users(
+@router.get("/me", response_model=UserRead)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    return current_user
+
+
+@router.put("/{user_id}", response_model=UserRead)
+async def update_user_endpoint(
+    user_id: UUID,
+    user_data: UserUpdate,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
 ):
-    # Опционально: проверка прав администратора
-    # if not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Not enough permissions")
-    users = await get_all_users(session=session)
-    return users
+    # только сам пользователь может обновить свой профиль (или админ)
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    hashed_password = get_password_hash(user_data.password)
+    updated = await update_user(
+        session, user_id, user_data.name, user_data.email, hashed_password
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
+@router.patch("/{user_id}", response_model=UserRead)
+async def patch_user_endpoint(
+    user_id: UUID,
+    patch_data: UserPatch,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # Преобразуем Pydantic-модель в dict, исключая None
+    data = patch_data.dict(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    if 'password' in data:
+        data['hashed_password'] = get_password_hash(data.pop('password'))
+    try:
+        updated = await crud_patch_user(session, user_id, data)
+        if not updated:
+            raise HTTPException(status_code=404, detail="User not found")
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(
+    user_id: UUID,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    # Только пользователь может удалить свой профиль
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Проверяем, что пользователь существует и не удален
+    user = await get_user_by_id(session, user_id, include_deleted=False)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        result = await soft_delete_user(session, user_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="User already deleted")
+        return {"detail": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
