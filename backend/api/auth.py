@@ -73,6 +73,8 @@ async def register(
         access_token, refresh_token = await _create_token_pair(session, new_user.id)
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -107,6 +109,7 @@ async def login(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unhandled exception during login", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during login"
@@ -152,6 +155,7 @@ async def refresh(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unhandled exception during token refresh", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during token refresh"

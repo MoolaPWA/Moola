@@ -1,5 +1,5 @@
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Literal
@@ -12,7 +12,11 @@ class TransactionBase(BaseModel):
 
     @field_validator('transaction_date')
     def not_future_date(cls, v: datetime) -> datetime:
-        if v > datetime.now().astimezone(v.tzinfo):
+        # If datetime is naive (no tz), skip strict future check — accept as-is
+        if v.tzinfo is None:
+            return v
+        now = datetime.now(timezone.utc)
+        if v.astimezone(timezone.utc) > now:
             raise ValueError('transaction_date cannot be in the future')
         return v
 
@@ -20,12 +24,16 @@ class TransactionCreate(TransactionBase):
     user_id: UUID = Field(..., description="ID пользователя")
     category_id: Optional[UUID] = Field(None, description="ID категории (если выбрана)")
 
-class TransactionRead(TransactionBase):
+class TransactionRead(BaseModel):
     id: UUID
     user_id: UUID
     category_id: Optional[UUID]
     created_at: datetime
     updated_at: datetime
+    amount: Decimal
+    type: Literal['income', 'expense']
+    transaction_date: datetime
+    description: Optional[str]
     model_config = {"from_attributes": True}
 
 class TransactionUpdate(BaseModel):
@@ -63,7 +71,11 @@ class TransactionSyncItem(BaseModel):
 
     @field_validator('date')
     def not_future(cls, v):
-        if v > datetime.now().astimezone(v.tzinfo):
+        # If datetime is naive (no tz), skip strict future check — accept as-is
+        if v.tzinfo is None:
+            return v
+        now = datetime.now(timezone.utc)
+        if v.astimezone(timezone.utc) > now:
             raise ValueError('date cannot be in the future')
         return v
     
