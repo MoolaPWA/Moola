@@ -17,6 +17,9 @@ db.version(3).stores({
     users: 'id',
     categories: 'id, user_id, is_deleted',
     transactions: 'id, user_id, category_id, transaction_date, is_synced, is_deleted',
+    categories: 'id, user_id',
+    transactions: 'id, user_id, category_id, transaction_date, is_synced',
+    auth: 'key',
 });
 
 const SW_ALLOWED_STORES = ['transactions'];

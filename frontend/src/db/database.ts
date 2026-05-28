@@ -29,31 +29,22 @@ export interface Transaction {
     is_deleted: 0 | 1;  // новое поле
 }
 
+
+export interface AuthRecord {
+    key: string; // 'refresh_token'
+    value: string;
+}
+
+
 class FinanceDatabase extends Dexie {
     users!: Table<User, string>;
     categories!: Table<Category, string>;
     transactions!: Table<Transaction, string>;
+    auth!: Table<AuthRecord, string>;
 
     constructor() {
         super(DB_NAME);
-
-        // v1 — начальная схема, не удалять
-        this.version(1).stores({
-            users: 'id',
-            categories: 'id, user_id',
-            transactions: 'id, user_id, category_id, transaction_date, is_synced',
-        });
-
-        // v2 — добавлен индекс is_deleted
-        // .upgrade() проставляет is_deleted = 0 всем существующим записям
-        this.version(DB_VERSION).stores(STORES).upgrade(async (tx) => {
-            await tx.table('categories').toCollection().modify((category) => {
-                category.is_deleted = 0;
-            });
-            await tx.table('transactions').toCollection().modify((transaction) => {
-                transaction.is_deleted = 0;
-            });
-        });
+        this.version(DB_VERSION).stores(STORES);
     }
 }
 

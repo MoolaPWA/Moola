@@ -1,4 +1,4 @@
-import { categoryService } from '../services/categoryService';
+import { categoryService } from '@/db/services/categoryService';
 import { DEFAULT_CATEGORIES } from './defaultCategories';
 
 // Запускается один раз при старте приложения

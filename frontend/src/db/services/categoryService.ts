@@ -1,5 +1,5 @@
-import { db, type Category } from '../database';
-import { generateUUID } from '../utils/uuid';
+import { db, type Category } from '../database.ts';
+import { generateUUID } from '../utils/uuid.ts';
 
 export const categoryService = {
 
