@@ -26,7 +26,6 @@ async def get_user_by_email(session: AsyncSession, email: str, include_deleted: 
     return result
 
 async def create_user(session: AsyncSession, name: str, email: str, hashed_password: str) -> User:
-    # Валидация: проверяем, нет ли пользователя с таким email
     existing = await get_user_by_email(session, email, include_deleted=False)
     if existing:
         raise ValueError(f"User with email '{email}' already exists")
@@ -78,13 +77,10 @@ async def patch_user(
     user_id: UUID,
     patch_data: dict,
 ) -> Optional[User]:
-    # Если передан email, проверить уникальность
     if 'email' in patch_data:
         existing = await get_user_by_email(session, patch_data['email'])
         if existing and existing.id != user_id:
             raise ValueError("Email already exists")
-    # Если передан пароль – хешировать (хеширование делаем в API слое, или здесь)
-    # В API будет вызван get_password_hash до вызова этой функции
     stmt = update(User).where(User.id == user_id).values(**patch_data).returning(User)
     result = await session.execute(stmt)
     await session.commit()
