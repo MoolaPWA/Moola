@@ -1,7 +1,8 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, String, Numeric, ForeignKey, Enum, Index, UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from core.db_helper import Base
 import enum
 
@@ -17,7 +18,16 @@ class Category(Base):
     name = Column(String(100), nullable=False)
     type = Column(Enum(TransactionType), nullable=False)
     cat_limit = Column(Numeric(10, 2), nullable=True)
-    id_icon = Column(String, default="default_icon")
+    is_deleted = Column(Boolean, server_default="false", nullable=False)
 
     user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
+
+    icon_path = Column(String(255), nullable=False, default="default_icon")
+    background_color = Column(String(7), nullable=False, default="#FFFFFF")
+    icon_color = Column(String(7), nullable=False, default="#000000")
+    
+    __table_args__ = (
+        Index("idx_categories_user_id", "user_id"),
+        UniqueConstraint("user_id", "name", "type", name="categories_user_id_name_type_key"),
+    )

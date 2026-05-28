@@ -41,10 +41,17 @@ class Token(BaseModel):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
 
+class CorsConfig(BaseModel):               # <-- новый класс
+    allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "https://your-production-domain.com"   # замените на реальный домен
+    ]
+
 class Settings(BaseSettings):
     run: RunConfig = RunConfig()
     api: ApiPrefix = ApiPrefix()
     db: DatabaseConfig = DatabaseConfig()
     token: Token = Token()
+    cors: CorsConfig = CorsConfig()         # <-- добавляем
 
 settings = Settings()
