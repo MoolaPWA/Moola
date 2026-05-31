@@ -5,12 +5,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Plus, List, Settings, TrendingUp, Wallet, BarChart3 } from "lucide-react";
 import { transactionService } from "@/db/services/transactionService";
 import type { Transaction } from "@/db/database";
+import { useSync } from "@/hooks/useSync";
+import { RefreshCw } from "lucide-react";
 
 const TEMP_USER_ID = "temp-user-1";
 
 export function DashboardScreen() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+
+  const { sync, isSyncing } = useSync();
+
+  const handleSync = async () => {
+    const success = await sync();
+    if (success) {
+      // Перезагружаем последние операции после синхронизации
+      const data = await transactionService.getLatest(TEMP_USER_ID, 3);
+      setLatestTransactions(data);
+    }
+  };
 
   useEffect(() => {
     // Если событие уже было — берём сразу
@@ -87,15 +100,27 @@ export function DashboardScreen() {
                 <p className="text-green-600 text-sm">Добро пожаловать!</p>
               </div>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/settings")}
-                className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
-                style={{ boxShadow: 'var(--shadow-neu-flat)' }}
-            >
-              <Settings className="w-6 h-6" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate("/settings")}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <Settings className="w-6 h-6" />
+              </Button>
+            </div>
           </div>
         </div>
 

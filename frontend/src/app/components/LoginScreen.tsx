@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { toast } from "sonner";
 import { login } from "@/services/api/auth";
 import type { ApiError } from "@/types/auth";
+import { useSync } from "@/hooks/useSync";
 
 export function LoginScreen() {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export function LoginScreen() {
     remember: false,
   });
 
+  const { sync } = useSync();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -27,6 +30,9 @@ export function LoginScreen() {
         email: formData.email,
         password: formData.password,
       });
+
+      await sync(true);
+
       toast.success("Добро пожаловать!");
       navigate("/dashboard");
     } catch (err) {
