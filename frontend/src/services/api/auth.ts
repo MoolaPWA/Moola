@@ -8,6 +8,22 @@ import type {
 import { db } from '@/db/database.ts';
 
 /**
+ * Данные текущего пользователя с сервера.
+ */
+export interface CurrentUser {
+    id: string;
+    name: string;
+    email: string;
+}
+
+/**
+ * Получает профиль текущего пользователя.
+ */
+export async function getCurrentUser(): Promise<CurrentUser> {
+    return apiRequest<CurrentUser>('/api/users/me', { method: 'GET' });
+}
+
+/**
  * Регистрирует нового пользователя.
  * Сервер возвращает пару токенов — сразу сохраняем.
  */
@@ -16,9 +32,13 @@ export async function register(payload: RegisterRequest): Promise<TokenResponse>
         method: 'POST',
         body: JSON.stringify(payload),
     });
-
     tokenStorage.setAccessToken(data.access_token);
     await tokenStorage.setRefreshToken(data.refresh_token);
+
+    // Сохраняем user_id
+    const user = await getCurrentUser();
+    tokenStorage.setUserId(user.id);
+
     return data;
 }
 
@@ -31,9 +51,12 @@ export async function login(payload: LoginRequest): Promise<TokenResponse> {
         method: 'POST',
         body: JSON.stringify(payload),
     });
-
     tokenStorage.setAccessToken(data.access_token);
     await tokenStorage.setRefreshToken(data.refresh_token);
+
+    const user = await getCurrentUser();
+    tokenStorage.setUserId(user.id);
+
     return data;
 }
 

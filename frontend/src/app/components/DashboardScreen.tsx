@@ -7,10 +7,11 @@ import { transactionService } from "@/db/services/transactionService";
 import type { Transaction } from "@/db/database";
 import { useSync } from "@/hooks/useSync";
 import { RefreshCw } from "lucide-react";
+import { useUser } from "@/context/UserContext";
 
-const TEMP_USER_ID = "temp-user-1";
 
 export function DashboardScreen() {
+  const { userId } = useUser();
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
 
@@ -18,9 +19,8 @@ export function DashboardScreen() {
 
   const handleSync = async () => {
     const success = await sync();
-    if (success) {
-      // Перезагружаем последние операции после синхронизации
-      const data = await transactionService.getLatest(TEMP_USER_ID, 3);
+    if (success && userId) {
+      const data = await transactionService.getLatest(userId, 3);
       setLatestTransactions(data);
     }
   };
@@ -57,10 +57,11 @@ export function DashboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await transactionService.getLatest(TEMP_USER_ID, 3);
+        const data = await transactionService.getLatest(userId, 3);
         setLatestTransactions(data);
       } catch (error) {
         console.error(error);
@@ -69,7 +70,7 @@ export function DashboardScreen() {
       }
     };
     load();
-  }, []);
+  }, [userId]);
 
   // Скелетон строки
   const SkeletonRow = () => (
