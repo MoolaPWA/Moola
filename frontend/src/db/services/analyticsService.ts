@@ -12,11 +12,10 @@ export const analyticsService = {
     async getSummary(user_id: string, from: string, to: string) {
         const transactions = await db.transactions
             .where('user_id').equals(user_id)
-            .filter((t) =>
-                t.is_deleted === 0 &&
-                t.transaction_date >= from &&
-                t.transaction_date <= to
-            )
+            .filter((t) => {
+                const date = t.transaction_date.split('T')[0]; // только дата, без времени
+                return t.is_deleted === 0 && date >= from && date <= to;
+            })
             .toArray();
 
         const totalIncome = transactions
@@ -39,18 +38,18 @@ export const analyticsService = {
     async getExpensesByCategory(user_id: string, from: string, to: string) {
         const transactions = await db.transactions
             .where('user_id').equals(user_id)
-            .filter((t) =>
-                t.is_deleted === 0 &&
-                t.type === 'expense' &&
-                t.transaction_date >= from &&
-                t.transaction_date <= to
-            )
+            .filter((t) => {
+                const date = t.transaction_date.split('T')[0];
+                return t.is_deleted === 0 &&
+                    t.type === 'expense' &&
+                    date >= from &&
+                    date <= to;
+            })
             .toArray();
 
         const categories = await categoryService.getAllByUser(user_id);
         const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
-        // Группируем по категории
         const grouped = new Map<string, number>();
         for (const t of transactions) {
             const current = grouped.get(t.category_id) ?? 0;
@@ -78,12 +77,13 @@ export const analyticsService = {
 
         const transactions = await db.transactions
             .where('user_id').equals(user_id)
-            .filter((t) =>
-                t.is_deleted === 0 &&
+            .filter((t) => {
+                const date = t.transaction_date.split('T')[0];
+                return t.is_deleted === 0 &&
                 t.type === 'expense' &&
-                t.transaction_date >= fromStr &&
-                t.transaction_date <= toStr
-            )
+                date >= fromStr &&
+                date <= toStr
+            })
             .toArray();
 
         // Группируем по дате
