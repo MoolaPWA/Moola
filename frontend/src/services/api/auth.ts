@@ -86,3 +86,28 @@ export async function hasSession(): Promise<boolean> {
     const token = await tokenStorage.getRefreshToken();
     return token !== null;
 }
+
+/**
+ * Обновляет access-токен по сохранённому refresh-токену.
+ * @returns true если успешно
+ */
+export async function refreshSession(): Promise<boolean> {
+    const refreshToken = await tokenStorage.getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+        const response = await fetch('http://localhost:8000/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        tokenStorage.setAccessToken(data.access_token);
+        await tokenStorage.setRefreshToken(data.refresh_token);
+        return true;
+    } catch {
+        return false;
+    }
+}

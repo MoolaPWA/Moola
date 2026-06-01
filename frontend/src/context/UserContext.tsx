@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { getCurrentUser } from '@/services/api/auth';
+import { getCurrentUser, refreshSession } from '@/services/api/auth';
 import { tokenStorage } from '@/services/api/tokenStorage';
+import {syncAll} from "@/services/api/syncManager.ts"
+
 
 interface UserContextValue {
     userId: string | null;
@@ -20,12 +22,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
             try {
                 const refresh = await tokenStorage.getRefreshToken();
                 if (refresh) {
-                    const user = await getCurrentUser();
-                    setUserId(user.id);
-                    tokenStorage.setUserId(user.id);
+                    const ok = await refreshSession();
+                    if (ok) {
+                        const user = await getCurrentUser();
+                        setUserId(user.id);
+                        tokenStorage.setUserId(user.id);
+                        await syncAll();
+                    }
                 }
             } catch {
-                // нет сессии или токен истёк — остаёмся без user
+                // нет сессии или токен истёк
             } finally {
                 setIsLoading(false);
             }

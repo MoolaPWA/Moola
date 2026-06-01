@@ -19,6 +19,7 @@ export function useSync() {
             }
             return true;
         } catch (err) {
+            console.error('SYNC ERROR:', err);
             const error = err as ApiError;
             if (error.kind === 'network') {
                 if (!silent) toast.error('Нет соединения — данные сохранены локально');
