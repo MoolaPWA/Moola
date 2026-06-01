@@ -1,12 +1,19 @@
 import { createRoot } from "react-dom/client";
 import App from "./app/App.tsx";
 import "./styles/index.css";
-// @ts-ignore
-import { db } from './db/database';
-import { syncService } from './db/services/syncService';
+import { syncService } from '@/db/services/syncService';
 
-createRoot(document.getElementById("root")!).render(<App />);
-syncService.register();
+// Перехватываем до рендера — событие не потеряется
+window.__installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window.__installPrompt = e;
+    window.dispatchEvent(new Event('installpromptready'));
+});
 
+async function init() {
+    syncService.register();
+    createRoot(document.getElementById("root")!).render(<App />);
+}
 
-  
+init();

@@ -1,11 +1,10 @@
 import Dexie, { type Table } from 'dexie';
-import {DB_NAME, STORES, DB_VERSION} from "@/db/schema.ts";
+import { DB_NAME, DB_VERSION, STORES } from './schema';
 
 export interface User {
-    id: string; // UUID
+    id: string;
     name: string;
     email: string;
-    // password не храним локально, только на сервере
 }
 
 export interface Category {
@@ -13,6 +12,7 @@ export interface Category {
     user_id: string;
     name: string;
     type: 'income' | 'expense';
+    is_deleted: 0 | 1;  // новое поле
 }
 
 export interface Transaction {
@@ -26,6 +26,13 @@ export interface Transaction {
     created_at: string;
     updated_at: string;
     is_synced: 0 | 1;
+    is_deleted: 0 | 1;  // новое поле
+}
+
+
+export interface AuthRecord {
+    key: string; // 'refresh_token'
+    value: string;
 }
 
 
@@ -33,10 +40,10 @@ class FinanceDatabase extends Dexie {
     users!: Table<User, string>;
     categories!: Table<Category, string>;
     transactions!: Table<Transaction, string>;
+    auth!: Table<AuthRecord, string>;
 
     constructor() {
         super(DB_NAME);
-
         this.version(DB_VERSION).stores(STORES);
     }
 }

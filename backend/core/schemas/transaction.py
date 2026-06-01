@@ -1,8 +1,8 @@
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
-from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Literal
 
 class TransactionBase(BaseModel):
     amount: Decimal = Field(..., gt=0, decimal_places=2, description="Сумма транзакции (положительное число)")
@@ -10,15 +10,77 @@ class TransactionBase(BaseModel):
     transaction_date: datetime = Field(..., description="Дата и время совершения транзакции")
     description: Optional[str] = Field(None, max_length=255, description="Описание (необязательно)")
 
+    @field_validator('transaction_date')
+    def not_future_date(cls, v: datetime) -> datetime:
+        # If datetime is naive (no tz), skip strict future check — accept as-is
+        if v.tzinfo is None:
+            return v
+        now = datetime.now(timezone.utc)
+        if v.astimezone(timezone.utc) > now:
+            raise ValueError('transaction_date cannot be in the future')
+        return v
+
 class TransactionCreate(TransactionBase):
     user_id: UUID = Field(..., description="ID пользователя")
     category_id: Optional[UUID] = Field(None, description="ID категории (если выбрана)")
 
-class TransactionRead(TransactionBase):
-    id: UUID = Field(..., description="Уникальный идентификатор транзакции")
-    user_id: UUID = Field(..., description="ID пользователя")
-    category_id: Optional[UUID] = Field(None, description="ID категории")
-    created_at: datetime = Field(..., description="Дата создания записи")
-    updated_at: datetime = Field(..., description="Дата последнего обновления")
-
+class TransactionRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    category_id: Optional[UUID]
+    created_at: datetime
+    updated_at: datetime
+    amount: Decimal
+    type: Literal['income', 'expense']
+    transaction_date: datetime
+    description: Optional[str]
     model_config = {"from_attributes": True}
+
+class TransactionUpdate(BaseModel):
+    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    type: Literal['income', 'expense']
+    transaction_date: datetime
+    description: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[UUID] = None
+
+class TransactionPatch(BaseModel):
+    amount: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
+    type: Optional[Literal['income', 'expense']] = None
+    transaction_date: Optional[datetime] = None
+    description: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[UUID] = None
+
+class TransactionPatchItem(BaseModel):
+    id: UUID
+    amount: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
+    type: Optional[Literal['income', 'expense']] = None
+    transaction_date: Optional[datetime] = None
+    description: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[UUID] = None
+
+class TransactionSyncItem(BaseModel):
+    id: UUID
+    updated_at: datetime
+    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    type: Literal['income', 'expense']
+    date: datetime
+    description: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[UUID] = None
+    is_deleted: bool
+    is_synced: bool
+
+    @field_validator('date')
+    def not_future(cls, v):
+        # If datetime is naive (no tz), skip strict future check — accept as-is
+        if v.tzinfo is None:
+            return v
+        now = datetime.now(timezone.utc)
+        if v.astimezone(timezone.utc) > now:
+            raise ValueError('date cannot be in the future')
+        return v
+    
+class TransactionSyncRequest(BaseModel):
+    items: List[TransactionSyncItem] = Field(..., max_items=1000)
+
+class BulkTransactionPatch(BaseModel):
+    updates: List[TransactionPatchItem]
