@@ -1,7 +1,7 @@
 import { tokenStorage } from './tokenStorage.ts';
 import type { ApiError, TokenResponse } from '@/types/auth.ts';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = '';
 
 // Эндпоинты которые не требуют access-токен в заголовке
 const PUBLIC_ENDPOINTS = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
