@@ -44,7 +44,8 @@ class Token(BaseModel):
 class CorsConfig(BaseModel):
     allowed_origins: list[str] = [
         "http://localhost:5173",
-        "https://your-production-domain.com"
+        "https://your-production-domain.com",
+        "https://finances.local",
     ]
 
 class Settings(BaseSettings):
