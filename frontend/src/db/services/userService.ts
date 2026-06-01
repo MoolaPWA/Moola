@@ -1,4 +1,5 @@
 import { db, type User } from '../database';
+import {generateUUID} from "@/db/utils/uuid.ts";
 
 export const userService = {
 
@@ -12,7 +13,7 @@ export const userService = {
 
     async create(data: Omit<User, 'id'>): Promise<string> {
         const user: User = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             ...data,
         };
         await db.users.add(user);

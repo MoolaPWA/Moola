@@ -9,6 +9,8 @@ import { OperationsListScreen } from "./components/OperationsListScreen";
 import { StatisticsScreen } from "./components/StatisticsScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 
+
+
 export const router = createBrowserRouter([
   {
     path: "/",
