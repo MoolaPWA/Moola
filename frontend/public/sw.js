@@ -54,8 +54,12 @@ self.addEventListener('activate', (event) => {
 
 // Отдаём из кеша, если есть — иначе из сети
 self.addEventListener('fetch', (event) => {
-    // API запросы не кешируем
-    if (event.request.url.includes('/api/')) return;
+    const url = new URL(event.request.url);
+
+    // Не трогаем запросы к API — пусть идут напрямую без вмешательства SW
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
+        return;
+    }
 
     event.respondWith(
         caches.match(event.request).then((cached) => {

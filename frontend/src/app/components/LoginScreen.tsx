@@ -9,6 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { toast } from "sonner";
 import { login } from "@/services/api/auth";
 import type { ApiError } from "@/types/auth";
+import { useSync } from "@/hooks/useSync";
+import { useUser } from "@/context/UserContext";
+import {getCurrentUser} from "@/services/api/auth"
 
 export function LoginScreen() {
   const navigate = useNavigate();
@@ -19,6 +22,9 @@ export function LoginScreen() {
     remember: false,
   });
 
+  const { sync } = useSync();
+  const { setUserId } = useUser();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -27,6 +33,11 @@ export function LoginScreen() {
         email: formData.email,
         password: formData.password,
       });
+
+      const user = await getCurrentUser();   // импортируй из auth
+      setUserId(user.id);
+      await sync(true);
+
       toast.success("Добро пожаловать!");
       navigate("/dashboard");
     } catch (err) {

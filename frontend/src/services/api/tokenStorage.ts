@@ -44,8 +44,19 @@ class TokenStorage {
      * Удаляет оба токена. Вызывается при логауте.
      */
     async clear(): Promise<void> {
+        this.userId = null;
         this.accessToken = null;
         await db.auth.delete(REFRESH_TOKEN_KEY);
+    }
+
+    private userId: string | null = null;
+
+    getUserId(): string | null {
+        return this.userId;
+    }
+
+    setUserId(id: string): void {
+        this.userId = id;
     }
 }
 

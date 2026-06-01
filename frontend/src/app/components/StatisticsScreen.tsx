@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend } from "recharts";
 import { analyticsService } from "@/db/services/analyticsService";
+import { useUser } from "@/context/UserContext";
 
-const TEMP_USER_ID = "temp-user-1";
 
 // Вычисляем from/to по выбранному периоду
 function getPeriodDates(period: string): { from: string; to: string } {
@@ -50,6 +50,7 @@ function getPeriodDays(period: string): number {
 
 export function StatisticsScreen() {
   const navigate = useNavigate();
+  const { userId } = useUser();
   const [timePeriod, setTimePeriod] = useState("month");
   const isMobile = window.innerWidth < 768;
 
@@ -65,16 +66,17 @@ export function StatisticsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    if (!userId) return;
     setIsLoading(true);
     try {
       const { from, to } = getPeriodDates(timePeriod);
 
       const [summary, byCategory, daily, monthly, top] = await Promise.all([
-        analyticsService.getSummary(TEMP_USER_ID, from, to),
-        analyticsService.getExpensesByCategory(TEMP_USER_ID, from, to),
-        analyticsService.getDailyExpenses(TEMP_USER_ID),
-        analyticsService.getMonthlyTrend(TEMP_USER_ID),
-        analyticsService.getTopCategory(TEMP_USER_ID, from, to),
+        analyticsService.getSummary(userId, from, to),
+        analyticsService.getExpensesByCategory(userId, from, to),
+        analyticsService.getDailyExpenses(userId),
+        analyticsService.getMonthlyTrend(userId),
+        analyticsService.getTopCategory(userId, from, to),
       ]);
 
       setTotalIncome(summary.totalIncome);
@@ -90,7 +92,7 @@ export function StatisticsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [timePeriod]);
+  }, [timePeriod, userId]);
 
   // Перезагружаем при смене периода
   useEffect(() => {

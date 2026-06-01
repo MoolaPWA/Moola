@@ -12,11 +12,12 @@ import { toast } from "sonner";
 import { transactionService } from "@/db/services/transactionService";
 import { categoryService } from "@/db/services/categoryService";
 import type { Transaction, Category } from "@/db/database";
+import { useUser } from "@/context/UserContext";
 
-const TEMP_USER_ID = "temp-user-1";
 
 export function OperationsListScreen() {
   const navigate = useNavigate();
+  const { userId } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -56,10 +57,10 @@ export function OperationsListScreen() {
 
   // Загрузка операций из БД
   const loadOperations = async () => {
+    if (!userId) return;
     setIsLoadingOperations(true);
     try {
-      const data = await transactionService.getAllByUser(TEMP_USER_ID);
-      // Сортируем по дате — новые сверху
+      const data = await transactionService.getAllByUser(userId);
       data.sort((a, b) => b.created_at.localeCompare(a.created_at));
       setOperations(data);
     } catch (error) {
@@ -71,9 +72,10 @@ export function OperationsListScreen() {
 
   // Загрузка категорий из БД
   const loadCategories = async () => {
+    if (!userId) return;
     setIsLoadingCategories(true);
     try {
-      const data = await categoryService.getAllByUser(TEMP_USER_ID);
+      const data = await categoryService.getAllByUser(userId);
       setCategories(data);
     } catch (error) {
       toast.error("Не удалось загрузить категории");
@@ -85,7 +87,7 @@ export function OperationsListScreen() {
   useEffect(() => {
     loadOperations();
     loadCategories();
-  }, []);
+  }, [userId]);
 
   // Фильтрация операций
   const filteredOperations = useMemo(() => {
@@ -176,7 +178,7 @@ export function OperationsListScreen() {
         toast.success("Категория обновлена!");
       } else {
         await categoryService.create({
-          user_id: TEMP_USER_ID,
+          user_id: userId!,
           name: categoryFormData.name,
           type: categoryFormData.type,
           is_deleted: 0,

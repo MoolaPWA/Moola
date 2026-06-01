@@ -2,15 +2,22 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Plus, List, Settings, TrendingUp, Wallet, BarChart3 } from "lucide-react";
+import { Plus, List, Settings, Wallet, BarChart3 } from "lucide-react";
 import { transactionService } from "@/db/services/transactionService";
 import type { Transaction } from "@/db/database";
+import { useSync } from "@/hooks/useSync";
+import { RefreshCw } from "lucide-react";
+import { useUser } from "@/context/UserContext";
+import { analyticsService } from "@/db/services/analyticsService";
 
-const TEMP_USER_ID = "temp-user-1";
 
 export function DashboardScreen() {
+  const { userId } = useUser();
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+
+  const { sync, isSyncing } = useSync();
+
 
   useEffect(() => {
     // Если событие уже было — берём сразу
@@ -39,16 +46,47 @@ export function DashboardScreen() {
     }
   };
 
+  const handleSync = async () => {
+    const success = await sync();
+    if (success && userId) {
+      const data = await transactionService.getLatest(userId, 3);
+      setLatestTransactions(data);
+
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString().split('T')[0];
+      const to = now.toISOString().split('T')[0];
+      const summary = await analyticsService.getSummary(userId, from, to);
+      setTotalIncome(summary.totalIncome);
+      setTotalExpenses(summary.totalExpenses);
+      setBalance(summary.balance);
+    }
+  };
+
   const navigate = useNavigate();
   const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await transactionService.getLatest(TEMP_USER_ID, 3);
+        const data = await transactionService.getLatest(userId, 3);
         setLatestTransactions(data);
+
+        // Суммы за текущий месяц
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), 1)
+            .toISOString().split('T')[0];
+        const to = now.toISOString().split('T')[0];
+        const summary = await analyticsService.getSummary(userId, from, to);
+        setTotalIncome(summary.totalIncome);
+        setTotalExpenses(summary.totalExpenses);
+        setBalance(summary.balance);
       } catch (error) {
         console.error(error);
       } finally {
@@ -56,7 +94,7 @@ export function DashboardScreen() {
       }
     };
     load();
-  }, []);
+  }, [userId]);
 
   // Скелетон строки
   const SkeletonRow = () => (
@@ -87,15 +125,27 @@ export function DashboardScreen() {
                 <p className="text-green-600 text-sm">Добро пожаловать!</p>
               </div>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/settings")}
-                className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
-                style={{ boxShadow: 'var(--shadow-neu-flat)' }}
-            >
-              <Settings className="w-6 h-6" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate("/settings")}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <Settings className="w-6 h-6" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -104,17 +154,15 @@ export function DashboardScreen() {
           <Card className="border-0 bg-[#e8f5e9] overflow-hidden" style={{ boxShadow: 'var(--shadow-neu-raised)' }}>
             <CardHeader className="relative">
               <CardTitle className="text-sm text-green-700 font-normal">
-                Доступно к расходу в этом месяце
+                Баланс за текущий месяц
               </CardTitle>
             </CardHeader>
             <CardContent className="relative pb-8">
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-green-900">45 750</span>
+      <span className="text-5xl font-bold text-green-900">
+        {balance.toLocaleString('ru-RU')}
+      </span>
                 <span className="text-2xl text-green-700">₽</span>
-              </div>
-              <div className="flex items-center gap-2 mt-4 text-green-600">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm">+12% к прошлому месяцу</span>
               </div>
             </CardContent>
           </Card>
@@ -165,13 +213,17 @@ export function DashboardScreen() {
           <div className="grid grid-cols-2 gap-4">
             <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">24,5k</div>
+                <div className="text-2xl font-bold text-red-600">
+                  {totalExpenses.toLocaleString('ru-RU')} ₽
+                </div>
                 <div className="text-sm text-green-700 mt-1">Расходы</div>
               </CardContent>
             </Card>
             <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">70,2k</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {totalIncome.toLocaleString('ru-RU')} ₽
+                </div>
                 <div className="text-sm text-green-700 mt-1">Доходы</div>
               </CardContent>
             </Card>
