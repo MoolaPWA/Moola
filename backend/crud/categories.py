@@ -91,7 +91,7 @@ async def soft_delete_category(session: AsyncSession, category_id: UUID) -> bool
     if category.is_deleted:
         raise ValueError("Category is already deleted")
     
-    stmt = update(Category).where(Category.id == category_id).values(is_deleted=True).returning(Category)
+    stmt = update(Category).where(Category.id == category_id).values(is_deleted=True)
     result = await session.execute(stmt)
     await session.commit()
     return result.rowcount > 0

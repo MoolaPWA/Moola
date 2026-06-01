@@ -60,13 +60,12 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
         # Валидация лимита категории (только для расходов)
         if transaction_data.type == 'expense' and category.cat_limit is not None:
             # Подсчитываем сумму расходов за текущий месяц по этой категории
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
+            from datetime import datetime as dt, timezone
+            now = dt.now(timezone.utc)
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             total_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 Transaction.user_id == user_id,
                 Transaction.category_id == category_id,
-                Transaction.transaction_date >= start_of_month,
                 Transaction.is_deleted == False
             )
             total_spent = await session.scalar(total_stmt)
@@ -170,10 +169,14 @@ async def patch_transactions_bulk(
 ) -> List[Transaction]:
     updated_transactions = []
     for update in updates:
-        tx_id = update.pop('id')
-        tx = await patch_transaction(session, tx_id, user_id, update)
-        if tx:
-            updated_transactions.append(tx)
+        try:
+            tx_id = update.id
+            update_data = update.model_dump(exclude={'id'}, exclude_none=True)
+            tx = await patch_transaction(session, tx_id, user_id, update_data)
+            if tx:
+                updated_transactions.append(tx)
+        except ValueError:
+            continue
     return updated_transactions
 
 async def sync_transactions_bulk(session: AsyncSession, user_id: UUID, items: list) -> list[Transaction]:

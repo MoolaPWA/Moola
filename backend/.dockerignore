@@ -4,4 +4,3 @@ __pycache__/
 ../frontend/.env
 .git/
 .gitignore
-database/

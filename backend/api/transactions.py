@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ from core.limiter import limiter
 from fastapi import Request
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+logger = logging.getLogger(__name__)
 
 @router.post("/sync", response_model=list[TransactionRead])
 @limiter.limit("10/minute")
@@ -40,18 +42,18 @@ async def create_transaction_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        # Принудительно подставляем ID пользователя (безопасность)
-        transaction_data.user_id = current_user.id
-        return await create_transaction(session, transaction_data)
+        transaction_data_dict = transaction_data.model_dump()
+        transaction_data_dict['user_id'] = current_user.id
+        tx_data = TransactionCreate(**transaction_data_dict)
+        return await create_transaction(session, tx_data)
 
     except ValueError as e:
-        # Ошибки из CRUD: категория не найдена, не принадлежит пользователю,
-        # несовпадение типов, превышение лимита и т.п.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
+        logger.error("Unhandled exception while creating transaction", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error while creating transaction"
@@ -69,13 +71,17 @@ async def list_transactions(
     category_id: Optional[UUID] = Query(None),
 ):
     """Получить список транзакций с пагинацией и фильтрацией"""
-    return await get_transactions_by_user(
-        session, current_user.id,
-        limit=limit, offset=offset,
-        type_filter=type_filter,
-        start_date=start_date, end_date=end_date,
-        category_id=category_id
-    )
+    try:
+        return await get_transactions_by_user(
+            session, current_user.id,
+            limit=limit, offset=offset,
+            type_filter=type_filter,
+            start_date=start_date, end_date=end_date,
+            category_id=category_id
+        )
+    except Exception as e:
+        logger.error("Error listing transactions", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.patch("/bulk", response_model=list[TransactionRead])
 async def patch_transactions_bulk_endpoint(
@@ -100,8 +106,8 @@ async def patch_transactions_bulk_endpoint(
             session, current_user.id, updates
         )
         return updated
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        return []
 
 @router.put("/{transaction_id}", response_model=TransactionRead)
 async def update_transaction_endpoint(
