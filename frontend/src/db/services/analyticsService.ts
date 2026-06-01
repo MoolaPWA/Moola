@@ -1,5 +1,5 @@
-import { db } from '../database';
-import { categoryService } from './categoryService';
+import { db } from '../database.ts';
+import { categoryService } from './categoryService.ts';
 
 const CHART_COLORS = [
     '#10b981', '#3b82f6', '#8b5cf6', '#ef4444',

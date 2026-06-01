@@ -1,4 +1,4 @@
-import { db, type User } from '../database';
+import { db, type User } from '../database.ts';
 import {generateUUID} from "@/db/utils/uuid.ts";
 
 export const userService = {
