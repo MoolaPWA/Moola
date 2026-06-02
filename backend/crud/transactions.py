@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, update, delete, func
 from typing import List, Sequence, Optional
 from uuid import UUID
@@ -47,7 +48,11 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
     user_id = transaction_data.user_id
     category_id = transaction_data.category_id
 
-    # Валидация: если категория указана, проверить её принадлежность пользователю и соответствие типа
+    if transaction_data.id:
+        existing_tx = await session.get(Transaction, transaction_data.id)
+        if existing_tx:
+            raise ValueError(f"Transaction with id '{transaction_data.id}' already exists")
+
     if category_id:
         category = await session.scalar(select(Category).where(Category.id == category_id, Category.is_deleted == False))
         if not category:
@@ -57,11 +62,8 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
         if category.type != transaction_data.type:
             raise ValueError(f"Transaction type '{transaction_data.type}' does not match category type '{category.type}'")
 
-        # Валидация лимита категории (только для расходов)
         if transaction_data.type == 'expense' and category.cat_limit is not None:
-            # Подсчитываем сумму расходов за текущий месяц по этой категории
-            from datetime import datetime as dt, timezone
-            now = dt.now(timezone.utc)
+            now = datetime.now(timezone.utc)
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             total_stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 Transaction.user_id == user_id,
@@ -73,6 +75,7 @@ async def create_transaction(session: AsyncSession, transaction_data: Transactio
                 raise ValueError(f"Exceeds category limit of {category.cat_limit}")
 
     new_transaction = Transaction(
+        id=transaction_data.id,
         user_id=user_id,
         category_id=category_id,
         amount=transaction_data.amount,

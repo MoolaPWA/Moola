@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import re
 
 ALLOWED_ICONS = {"icons/default.svg", "icons/food.svg", "icons/taxi.svg", "icons/shopping.svg"}  # пример
@@ -41,9 +42,11 @@ class CategoryBase(BaseModel):
         return v
 
 class CategoryCreateRequest(CategoryBase):
+    id: Optional[UUID] = None
     pass
 
 class CategoryCreate(CategoryBase):
+    id: Optional[UUID] = None
     user_id: UUID
     cat_limit: Optional[float] = Field(None, ge=0)
 
@@ -66,3 +69,35 @@ class CategoryPatch(BaseModel):
     icon_path: Optional[str] = Field(None, description="Относительный путь к иконке")
     background_color: Optional[str] = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
     icon_color: Optional[str] = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
+
+class CategorySyncItem(BaseModel):
+    """Одна категория, присылаемая клиентом при синхронизации."""
+    id: UUID
+    updated_at: datetime
+    name: str = Field(..., min_length=2, max_length=100)
+    type: Literal['income', 'expense']
+    icon_path: str = Field(
+        "default_icon",
+        description="Относительный путь к иконке (без ../). Например: icons/food.svg"
+    )
+    background_color: str = Field(
+        "#FFFFFF",
+        pattern=r"^#[0-9a-fA-F]{6}$"
+    )
+    icon_color: str = Field(
+        "#000000",
+        pattern=r"^#[0-9a-fA-F]{6}$"
+    )
+    is_deleted: bool = False
+
+    @field_validator('icon_path')
+    def validate_icon_path(cls, v):
+        if '..' in v or v.startswith('/'):
+            raise ValueError('icon_path не должен содержать .. или /')
+        if not re.match(r'^[a-zA-Z0-9_/]+\.svg$', v):
+            raise ValueError('icon_path должен соответствовать шаблону')
+        return v
+
+
+class CategorySyncRequest(BaseModel):
+    items: List[CategorySyncItem] = Field(..., max_items=500)

@@ -36,7 +36,7 @@ async def sync_transactions(
     return await sync_transactions_bulk(session, current_user.id, sync_data.items)
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
-async def create_transaction_endpoint(
+async def create_transaction_endpoint( 
     transaction_data: TransactionCreate,
     session: AsyncSession = Depends(db_helper.session_getter),
     current_user: User = Depends(get_current_user),
