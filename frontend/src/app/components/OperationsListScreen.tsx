@@ -122,9 +122,10 @@ export function OperationsListScreen() {
       const matchesCategory =
           filterCategory === "all" || op.category_id === filterCategory;
 
+      const opDate = op.transaction_date.split("T")[0];
       let matchesPeriod = true;
-      if (periodFrom) matchesPeriod = op.transaction_date >= periodFrom;
-      if (periodTo) matchesPeriod = matchesPeriod && op.transaction_date <= periodTo;
+      if (periodFrom) matchesPeriod = opDate >= periodFrom;
+      if (periodTo) matchesPeriod = matchesPeriod && opDate <= periodTo;
 
       return matchesSearch && matchesType && matchesCategory && matchesPeriod;
     });

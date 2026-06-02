@@ -22,13 +22,6 @@ export const transactionService = {
             .toArray();
     },
 
-    async getByDateRange(user_id: string, from: string, to: string): Promise<Transaction[]> {
-        return db.transactions
-            .where('transaction_date').between(from, to, true, true)
-            .filter((t) => t.user_id === user_id && t.is_deleted === 0)
-            .toArray();
-    },
-
     async getUnsynced(): Promise<Transaction[]> {
         return db.transactions.where('is_synced').equals(0).toArray();
     },
