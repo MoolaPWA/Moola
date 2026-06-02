@@ -96,7 +96,7 @@ export interface ApiCategoryCreate {
  * Дефолтные значения для полей категории, которых нет в локальной схеме.
  */
 const DEFAULT_CATEGORY_VISUALS = {
-    icon_path: 'default_icon',
+    icon_path: 'static/icons/other.svg',
     background_color: '#FFFFFF',
     icon_color: '#000000',
 } as const;

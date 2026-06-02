@@ -31,3 +31,12 @@ export async function createCategory(category: Category): Promise<Category> {
 
     return fromApiCategory(response);
 }
+
+/**
+ * Удаляет категорию на сервере.
+ */
+export async function deleteCategory(categoryId: string): Promise<void> {
+    await apiRequest<void>(`/api/categories/${categoryId}`, {
+        method: 'DELETE',
+    });
+}

@@ -21,6 +21,7 @@ class TransactionBase(BaseModel):
         return v
 
 class TransactionCreate(TransactionBase):
+    id: Optional[UUID] = None
     user_id: UUID = Field(..., description="ID пользователя")
     category_id: Optional[UUID] = Field(None, description="ID категории (если выбрана)")
 

@@ -122,9 +122,10 @@ export function OperationsListScreen() {
       const matchesCategory =
           filterCategory === "all" || op.category_id === filterCategory;
 
+      const opDate = op.transaction_date.split("T")[0];
       let matchesPeriod = true;
-      if (periodFrom) matchesPeriod = op.transaction_date >= periodFrom;
-      if (periodTo) matchesPeriod = matchesPeriod && op.transaction_date <= periodTo;
+      if (periodFrom) matchesPeriod = opDate >= periodFrom;
+      if (periodTo) matchesPeriod = matchesPeriod && opDate <= periodTo;
 
       return matchesSearch && matchesType && matchesCategory && matchesPeriod;
     });
@@ -415,7 +416,7 @@ export function OperationsListScreen() {
                                 <div>
                                   <div className="font-semibold text-green-900">{operation.description || "Без описания"}</div>
                                   <div className="text-sm text-green-700">
-                                    {categories.find(c => c.id === operation.category_id)?.name ?? operation.category_id}
+                                    {categories.find(c => c.id === operation.category_id)?.name ?? "Без категории"}
                                   </div>
                                   <div className="text-xs text-green-600 mt-1">
                                     {new Date(operation.transaction_date).toLocaleDateString('ru-RU', {

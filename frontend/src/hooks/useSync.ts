@@ -13,9 +13,9 @@ export function useSync() {
     const sync = useCallback(async (silent = false): Promise<boolean> => {
         setIsSyncing(true);
         try {
-            const result = await syncAll();
+            await syncAll();
             if (!silent) {
-                toast.success(`Синхронизировано: ${result.pushed} отправлено, ${result.pulled} получено`);
+                toast.success("Синхронизация завершена");
             }
             return true;
         } catch (err) {
