@@ -65,14 +65,16 @@ export async function login(payload: LoginRequest): Promise<TokenResponse> {
  */
 export async function logout(): Promise<void> {
     try {
-        await apiRequest<void>('/api/auth/logout', { method: 'POST' });
+        const refreshToken = await tokenStorage.getRefreshToken();
+        await apiRequest<void>('/api/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({ refresh_token: refreshToken }),
+        });
     } catch {
         // Даже если сервер недоступен — продолжаем локальную очистку
     }
 
     await tokenStorage.clear();
-
-    // Очищаем локальные данные пользователя
     await db.transactions.clear();
     await db.categories.clear();
     await db.users.clear();
