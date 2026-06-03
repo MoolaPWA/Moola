@@ -8,19 +8,37 @@ export interface SyncResult {
 }
 
 export async function syncAllTransactions(): Promise<SyncResult> {
-    // 1. PUSH — отправляем несинхронизированные
+    // PUSH — отправляем несинхронизированные
     const unsynced = await db.transactions
         .where('is_synced').equals(0)
         .toArray();
 
-    await syncTransactions(unsynced);
+    // Категории уже синхронизированы (syncAll вызывает их первыми).
+    // Берём актуальные id категорий чтобы не отправить транзакцию с мёртвой категорией.
+    const validCategories = await db.categories.toArray();
+    const validCategoryIds = new Set(validCategories.map((c) => c.id));
+
+// Отправляем только транзакции с валидной категорией (и удаления, и обычные)
+    const safeToPush = unsynced.filter((t) => validCategoryIds.has(t.category_id));
+
+// Осиротевшие (категории нет на сервере) — убираем локально без отправки
+    const orphaned = unsynced.filter((t) => !validCategoryIds.has(t.category_id));
+    if (orphaned.length > 0) {
+        console.warn('Осиротевшие транзакции удаляются локально:', orphaned);
+        await db.transaction('rw', db.transactions, async () => {
+            for (const t of orphaned) {
+                await db.transactions.delete(t.id);
+            }
+        });
+    }
+
+    await syncTransactions(safeToPush);
 
     // 2. PULL — скачиваем актуальное состояние с сервера
     const serverTransactions = await fetchTransactions();
 
     // 3. Перезаписываем локальную БД
     await db.transaction('rw', db.transactions, async () => {
-        // Удаляем локальные что были помечены на удаление и ушли
         const deletedIds = unsynced
             .filter((t) => t.is_deleted === 1)
             .map((t) => t.id);
@@ -28,14 +46,13 @@ export async function syncAllTransactions(): Promise<SyncResult> {
             await db.transactions.delete(id);
         }
 
-        // Записываем всё что пришло с сервера
         for (const t of serverTransactions) {
             await db.transactions.put(t);
         }
     });
 
     return {
-        pushed: unsynced.length,
+        pushed: safeToPush.length,
         pulled: serverTransactions.length,
     };
 }

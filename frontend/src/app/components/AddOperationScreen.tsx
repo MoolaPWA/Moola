@@ -11,6 +11,7 @@ import { transactionService } from "@/db/services/transactionService";
 import { categoryService } from "@/db/services/categoryService";
 import type { Category } from "@/db/database";
 import { useUser } from "@/context/UserContext";
+import { useSync } from "@/hooks/useSync";
 
 
 export function AddOperationScreen() {
@@ -18,6 +19,7 @@ export function AddOperationScreen() {
   const { userId } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]); // ← только это, без хардкода
+  const { sync } = useSync();
   const [formData, setFormData] = useState({
     type: "expense",
     category: "",
@@ -52,6 +54,10 @@ export function AddOperationScreen() {
         is_synced: 0,
         is_deleted: 0,
       });
+
+      // Сразу отправляем на сервер (тихо)
+      sync(true).then((ok) => console.log('sync после создания:', ok));;
+
       toast.success("Операция успешно добавлена!");
       navigate("/dashboard");
     } catch (error) {
@@ -169,6 +175,7 @@ export function AddOperationScreen() {
                       type="date"
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      max={new Date().toISOString().split('T')[0]}
                       required
                       className="rounded-xl py-6 border-0 bg-[#e8f5e9]"
                       style={{ boxShadow: 'var(--shadow-neu-pressed)' }}

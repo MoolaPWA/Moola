@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -47,8 +47,21 @@ export function DashboardScreen() {
   };
 
   const handleSync = async () => {
-    const success = await sync();
-    if (success && userId) {
+    await sync();
+    // loadData вызовется автоматически через событие datasync из useSync
+  };
+
+  const navigate = useNavigate();
+  const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [balance, setBalance] = useState(0);
+
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    try {
       const data = await transactionService.getLatest(userId, 3);
       setLatestTransactions(data);
 
@@ -60,41 +73,23 @@ export function DashboardScreen() {
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
       setBalance(summary.balance);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const navigate = useNavigate();
-  const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [totalIncome, setTotalIncome] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
-  const [balance, setBalance] = useState(0);
-
-  useEffect(() => {
-    if (!userId) return;
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await transactionService.getLatest(userId, 3);
-        setLatestTransactions(data);
-
-        // Суммы за текущий месяц
-        const now = new Date();
-        const from = new Date(now.getFullYear(), now.getMonth(), 1)
-            .toISOString().split('T')[0];
-        const to = now.toISOString().split('T')[0];
-        const summary = await analyticsService.getSummary(userId, from, to);
-        setTotalIncome(summary.totalIncome);
-        setTotalExpenses(summary.totalExpenses);
-        setBalance(summary.balance);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
   }, [userId]);
+
+// Загрузка при монтировании и смене пользователя
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+// Перезагрузка после автосинхронизации
+  useEffect(() => {
+    window.addEventListener('datasync', loadData);
+    return () => window.removeEventListener('datasync', loadData);
+  }, [loadData]);
 
   // Скелетон строки
   const SkeletonRow = () => (
@@ -181,7 +176,7 @@ export function DashboardScreen() {
                 onClick={() => navigate("/operations")}
                 variant="outline"
                 className="border-0 bg-[#e8f5e9] text-green-900 hover:bg-green-50 py-8 rounded-2xl flex items-center justify-center gap-3 text-lg"
-                style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+                style={{ boxShadow: 'var(--shadow-neu-raised)' }}
             >
               <List className="w-6 h-6" />
               Список операций
@@ -193,7 +188,7 @@ export function DashboardScreen() {
               onClick={() => navigate("/statistics")}
               variant="outline"
               className="w-full border-0 bg-[#e8f5e9] text-green-900 hover:bg-green-50 py-8 rounded-2xl flex items-center justify-center gap-3 text-lg"
-              style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+              style={{ boxShadow: 'var(--shadow-neu-raised)' }}
           >
             <BarChart3 className="w-6 h-6" />
             Статистика
@@ -211,7 +206,7 @@ export function DashboardScreen() {
 
           {/* Quick Stats — без изменений */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
+            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-red-600">
                   {totalExpenses.toLocaleString('ru-RU')} ₽
@@ -219,7 +214,7 @@ export function DashboardScreen() {
                 <div className="text-sm text-green-700 mt-1">Расходы</div>
               </CardContent>
             </Card>
-            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
+            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-green-600">
                   {totalIncome.toLocaleString('ru-RU')} ₽

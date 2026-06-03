@@ -94,9 +94,15 @@ export function StatisticsScreen() {
     }
   }, [timePeriod, userId]);
 
-  // Перезагружаем при смене периода
+  // Загрузка при монтировании, смене периода и пользователя
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+// Перезагрузка после автосинхронизации
+  useEffect(() => {
+    window.addEventListener('datasync', loadData);
+    return () => window.removeEventListener('datasync', loadData);
   }, [loadData]);
 
   // Пустое состояние для графиков
@@ -262,10 +268,18 @@ export function StatisticsScreen() {
                 </CardHeader>
                 <CardContent>
                   {dailyData.every(d => d.amount === 0) ? <EmptyChart /> : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={dailyData}>
+                      <ResponsiveContainer width="100%" height={320}>
+                        <BarChart data={dailyData} margin={{ bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
-                          <XAxis dataKey="day" stroke="#558b2f" tick={{ fontSize: 11 }} interval={4} />
+                          <XAxis
+                              dataKey="day"
+                              stroke="#558b2f"
+                              tick={{ fontSize: 11 }}
+                              interval={4}
+                              angle={-45}
+                              textAnchor="end"
+                              height={50}
+                          />
                           <YAxis stroke="#558b2f" />
                           <Tooltip
                               formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}
