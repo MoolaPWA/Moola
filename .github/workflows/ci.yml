@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, docker-https ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 env:
   REGISTRY: ghcr.io
