@@ -14,6 +14,8 @@ export function useSync() {
         setIsSyncing(true);
         try {
             await syncAll();
+            // Сообщаем экранам что данные обновились — пусть перечитают БД
+            window.dispatchEvent(new Event('datasync'));
             if (!silent) {
                 toast.success("Синхронизация завершена");
             }
@@ -24,7 +26,7 @@ export function useSync() {
             if (error.kind === 'network') {
                 if (!silent) toast.error('Нет соединения — данные сохранены локально');
             } else if (error.kind === 'unauthorized') {
-                // 401 уже обработан в client.ts (refresh или логаут)
+                // 401 уже обработан в client.ts
             } else {
                 if (!silent) toast.error('Ошибка синхронизации');
             }

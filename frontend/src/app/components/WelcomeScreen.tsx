@@ -1,9 +1,28 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import { Wallet, TrendingUp, PieChart, Shield } from "lucide-react";
+import { useUser } from "@/context/UserContext";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
+  const { userId, isLoading } = useUser();
+
+  // Если сессия восстановлена — сразу на dashboard
+  useEffect(() => {
+    if (!isLoading && userId) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isLoading, userId, navigate]);
+
+  // Пока проверяем сессию — показываем заглушку, чтобы не мелькал welcome
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-[#e8f5e9]">
+          <Wallet className="w-12 h-12 text-green-600 animate-pulse" />
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#e8f5e9]">

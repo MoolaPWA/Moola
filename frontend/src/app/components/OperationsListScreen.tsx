@@ -89,6 +89,15 @@ export function OperationsListScreen() {
     loadCategories();
   }, [userId]);
 
+  useEffect(() => {
+    const reload = () => {
+      loadOperations();
+      loadCategories();
+    };
+    window.addEventListener('datasync', reload);
+    return () => window.removeEventListener('datasync', reload);
+  }, [userId]);
+
   // Фильтрация операций
   const filteredOperations = useMemo(() => {
     const now = new Date();
