@@ -1,7 +1,7 @@
-import { db } from '../database';
-import { categoryService } from './categoryService';
-import { transactionService } from './transactionService';
-import type { Category, Transaction } from '../database';
+import { db } from '../database.ts';
+import { categoryService } from './categoryService.ts';
+import { transactionService } from './transactionService.ts';
+import type { Category, Transaction } from '../database.ts';
 
 // Создать категорию + транзакцию (атомарно)
 export async function createCategoryWithTransaction(

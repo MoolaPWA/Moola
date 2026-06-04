@@ -1,14 +1,16 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import db_helper
-from core.schemas.category import CategoryCreateRequest, CategoryPatch, CategoryRead, CategoryCreate, CategoryUpdate
-from crud.categories import create_category, get_categories_by_user, update_category, get_category_by_id, soft_delete_category, patch_category as crud_patch_category
+from core.schemas.category import CategoryCreateRequest, CategoryPatch, CategoryRead, CategoryCreate, CategoryUpdate, CategorySyncRequest
+from crud.categories import sync_categories_bulk, create_category, get_categories_by_user, update_category, get_category_by_id, soft_delete_category, patch_category as crud_patch_category
 from core.auth import get_current_user
 from core.models import User
+from core.schemas.category import CategorySyncRequest
+from core.limiter import limiter
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
@@ -20,6 +22,7 @@ async def create_category_endpoint(
 ):
     try:
         create_data = CategoryCreate(
+            id=category_data.id,
             user_id=current_user.id,
             name=category_data.name,
             type=category_data.type,
@@ -47,6 +50,22 @@ async def create_category_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error while creating category"
         )
+    
+@router.post("/sync", response_model=List[CategoryRead])
+@limiter.limit("10/minute")
+async def sync_categories(
+    request: Request,
+    sync_data: CategorySyncRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Синхронизация категорий.
+    Клиент отправляет массив категорий с полями id, updated_at и данными.
+    """
+    items_dicts = [item.model_dump() for item in sync_data.items]
+    synced = await sync_categories_bulk(session, current_user.id, items_dicts)
+    return synced
 
 @router.get("", response_model=list[CategoryRead])
 async def list_categories(

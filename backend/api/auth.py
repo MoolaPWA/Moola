@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 import logging
 
+from core.utils import _create_default_categories
 from core import db_helper
 from core.models import User, RefreshToken
 from core.auth import (
@@ -57,7 +58,6 @@ async def register(
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
     try:
-        # Валидация email на уникальность (дополнительно к CRUD)
         existing = await get_user_by_email(session, user_data.email)
         if existing:
             raise HTTPException(
@@ -69,16 +69,26 @@ async def register(
         new_user = await create_user(
             session, user_data.name, user_data.email, hashed_password
         )
+    
+        await _create_default_categories(session, new_user.id)
 
         access_token, refresh_token = await _create_token_pair(session, new_user.id)
+
+        await session.commit()
+
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
+    except HTTPException:
+        await session.rollback()
+        raise
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
+        await session.rollback()
         logger.error("Unhandled exception", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -107,6 +117,7 @@ async def login(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unhandled exception during login", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during login"
@@ -152,6 +163,7 @@ async def refresh(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unhandled exception during token refresh", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during token refresh"

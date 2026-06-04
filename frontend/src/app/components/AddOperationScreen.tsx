@@ -10,13 +10,16 @@ import { toast } from "sonner";
 import { transactionService } from "@/db/services/transactionService";
 import { categoryService } from "@/db/services/categoryService";
 import type { Category } from "@/db/database";
+import { useUser } from "@/context/UserContext";
+import { useSync } from "@/hooks/useSync";
 
-const TEMP_USER_ID = "temp-user-1";
 
 export function AddOperationScreen() {
   const navigate = useNavigate();
+  const { userId } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]); // ← только это, без хардкода
+  const { sync } = useSync();
   const [formData, setFormData] = useState({
     type: "expense",
     category: "",
@@ -25,20 +28,22 @@ export function AddOperationScreen() {
     description: "",
   });
 
-  // Загружаем категории из БД при открытии экрана
+  // Загружаем категории по реальному user_id
   useEffect(() => {
-    categoryService.getAllByUser(TEMP_USER_ID).then(setCategories);
-  }, []);
+    if (!userId) return;
+    categoryService.getAllByUser(userId).then(setCategories);
+  }, [userId]);
 
   const filteredCategories = categories.filter(cat => cat.type === formData.type);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userId) return;
     setIsLoading(true);
     try {
       const now = new Date().toISOString();
       await transactionService.create({
-        user_id: TEMP_USER_ID,
+        user_id: userId,
         category_id: formData.category,
         amount: Number(formData.amount),
         type: formData.type as "income" | "expense",
@@ -49,6 +54,10 @@ export function AddOperationScreen() {
         is_synced: 0,
         is_deleted: 0,
       });
+
+      // Сразу отправляем на сервер (тихо)
+      sync(true).then((ok) => console.log('sync после создания:', ok));;
+
       toast.success("Операция успешно добавлена!");
       navigate("/dashboard");
     } catch (error) {
@@ -166,6 +175,7 @@ export function AddOperationScreen() {
                       type="date"
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      max={new Date().toISOString().split('T')[0]}
                       required
                       className="rounded-xl py-6 border-0 bg-[#e8f5e9]"
                       style={{ boxShadow: 'var(--shadow-neu-pressed)' }}

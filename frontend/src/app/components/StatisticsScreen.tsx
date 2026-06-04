@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend } from "recharts";
 import { analyticsService } from "@/db/services/analyticsService";
+import { useUser } from "@/context/UserContext";
 
-const TEMP_USER_ID = "temp-user-1";
 
 // Вычисляем from/to по выбранному периоду
 function getPeriodDates(period: string): { from: string; to: string } {
@@ -50,6 +50,7 @@ function getPeriodDays(period: string): number {
 
 export function StatisticsScreen() {
   const navigate = useNavigate();
+  const { userId } = useUser();
   const [timePeriod, setTimePeriod] = useState("month");
   const isMobile = window.innerWidth < 768;
 
@@ -65,16 +66,17 @@ export function StatisticsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    if (!userId) return;
     setIsLoading(true);
     try {
       const { from, to } = getPeriodDates(timePeriod);
 
       const [summary, byCategory, daily, monthly, top] = await Promise.all([
-        analyticsService.getSummary(TEMP_USER_ID, from, to),
-        analyticsService.getExpensesByCategory(TEMP_USER_ID, from, to),
-        analyticsService.getDailyExpenses(TEMP_USER_ID),
-        analyticsService.getMonthlyTrend(TEMP_USER_ID),
-        analyticsService.getTopCategory(TEMP_USER_ID, from, to),
+        analyticsService.getSummary(userId, from, to),
+        analyticsService.getExpensesByCategory(userId, from, to),
+        analyticsService.getDailyExpenses(userId),
+        analyticsService.getMonthlyTrend(userId),
+        analyticsService.getTopCategory(userId, from, to),
       ]);
 
       setTotalIncome(summary.totalIncome);
@@ -90,11 +92,17 @@ export function StatisticsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [timePeriod]);
+  }, [timePeriod, userId]);
 
-  // Перезагружаем при смене периода
+  // Загрузка при монтировании, смене периода и пользователя
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+// Перезагрузка после автосинхронизации
+  useEffect(() => {
+    window.addEventListener('datasync', loadData);
+    return () => window.removeEventListener('datasync', loadData);
   }, [loadData]);
 
   // Пустое состояние для графиков
@@ -260,10 +268,18 @@ export function StatisticsScreen() {
                 </CardHeader>
                 <CardContent>
                   {dailyData.every(d => d.amount === 0) ? <EmptyChart /> : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={dailyData}>
+                      <ResponsiveContainer width="100%" height={320}>
+                        <BarChart data={dailyData} margin={{ bottom: 40 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
-                          <XAxis dataKey="day" stroke="#558b2f" tick={{ fontSize: 11 }} interval={4} />
+                          <XAxis
+                              dataKey="day"
+                              stroke="#558b2f"
+                              tick={{ fontSize: 11 }}
+                              interval={4}
+                              angle={-45}
+                              textAnchor="end"
+                              height={50}
+                          />
                           <YAxis stroke="#558b2f" />
                           <Tooltip
                               formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}

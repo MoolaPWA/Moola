@@ -17,6 +17,9 @@ db.version(3).stores({
     users: 'id',
     categories: 'id, user_id, is_deleted',
     transactions: 'id, user_id, category_id, transaction_date, is_synced, is_deleted',
+    categories: 'id, user_id',
+    transactions: 'id, user_id, category_id, transaction_date, is_synced',
+    auth: 'key',
 });
 
 const SW_ALLOWED_STORES = ['transactions'];
@@ -51,8 +54,12 @@ self.addEventListener('activate', (event) => {
 
 // Отдаём из кеша, если есть — иначе из сети
 self.addEventListener('fetch', (event) => {
-    // API запросы не кешируем
-    if (event.request.url.includes('/api/')) return;
+    const url = new URL(event.request.url);
+
+    // Не трогаем запросы к API — пусть идут напрямую без вмешательства SW
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
+        return;
+    }
 
     event.respondWith(
         caches.match(event.request).then((cached) => {

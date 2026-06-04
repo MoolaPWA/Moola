@@ -1,16 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Plus, List, Settings, TrendingUp, Wallet, BarChart3 } from "lucide-react";
+import { Plus, List, Settings, Wallet, BarChart3 } from "lucide-react";
 import { transactionService } from "@/db/services/transactionService";
 import type { Transaction } from "@/db/database";
+import { useSync } from "@/hooks/useSync";
+import { RefreshCw } from "lucide-react";
+import { useUser } from "@/context/UserContext";
+import { analyticsService } from "@/db/services/analyticsService";
 
-const TEMP_USER_ID = "temp-user-1";
 
 export function DashboardScreen() {
+  const { userId } = useUser();
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+
+  const { sync, isSyncing } = useSync();
+
 
   useEffect(() => {
     // Если событие уже было — берём сразу
@@ -39,24 +46,50 @@ export function DashboardScreen() {
     }
   };
 
+  const handleSync = async () => {
+    await sync();
+    // loadData вызовется автоматически через событие datasync из useSync
+  };
+
   const navigate = useNavigate();
   const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [balance, setBalance] = useState(0);
 
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    try {
+      const data = await transactionService.getLatest(userId, 3);
+      setLatestTransactions(data);
+
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString().split('T')[0];
+      const to = now.toISOString().split('T')[0];
+      const summary = await analyticsService.getSummary(userId, from, to);
+      setTotalIncome(summary.totalIncome);
+      setTotalExpenses(summary.totalExpenses);
+      setBalance(summary.balance);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+// Загрузка при монтировании и смене пользователя
   useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await transactionService.getLatest(TEMP_USER_ID, 3);
-        setLatestTransactions(data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
-  }, []);
+    loadData();
+  }, [loadData]);
+
+// Перезагрузка после автосинхронизации
+  useEffect(() => {
+    window.addEventListener('datasync', loadData);
+    return () => window.removeEventListener('datasync', loadData);
+  }, [loadData]);
 
   // Скелетон строки
   const SkeletonRow = () => (
@@ -87,15 +120,27 @@ export function DashboardScreen() {
                 <p className="text-green-600 text-sm">Добро пожаловать!</p>
               </div>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/settings")}
-                className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
-                style={{ boxShadow: 'var(--shadow-neu-flat)' }}
-            >
-              <Settings className="w-6 h-6" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate("/settings")}
+                  className="text-green-900 hover:bg-green-100 rounded-xl bg-[#e8f5e9]"
+                  style={{ boxShadow: 'var(--shadow-neu-flat)' }}
+              >
+                <Settings className="w-6 h-6" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -104,17 +149,15 @@ export function DashboardScreen() {
           <Card className="border-0 bg-[#e8f5e9] overflow-hidden" style={{ boxShadow: 'var(--shadow-neu-raised)' }}>
             <CardHeader className="relative">
               <CardTitle className="text-sm text-green-700 font-normal">
-                Доступно к расходу в этом месяце
+                Баланс за текущий месяц
               </CardTitle>
             </CardHeader>
             <CardContent className="relative pb-8">
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-green-900">45 750</span>
+      <span className="text-5xl font-bold text-green-900">
+        {balance.toLocaleString('ru-RU')}
+      </span>
                 <span className="text-2xl text-green-700">₽</span>
-              </div>
-              <div className="flex items-center gap-2 mt-4 text-green-600">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm">+12% к прошлому месяцу</span>
               </div>
             </CardContent>
           </Card>
@@ -133,7 +176,7 @@ export function DashboardScreen() {
                 onClick={() => navigate("/operations")}
                 variant="outline"
                 className="border-0 bg-[#e8f5e9] text-green-900 hover:bg-green-50 py-8 rounded-2xl flex items-center justify-center gap-3 text-lg"
-                style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+                style={{ boxShadow: 'var(--shadow-neu-raised)' }}
             >
               <List className="w-6 h-6" />
               Список операций
@@ -145,7 +188,7 @@ export function DashboardScreen() {
               onClick={() => navigate("/statistics")}
               variant="outline"
               className="w-full border-0 bg-[#e8f5e9] text-green-900 hover:bg-green-50 py-8 rounded-2xl flex items-center justify-center gap-3 text-lg"
-              style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
+              style={{ boxShadow: 'var(--shadow-neu-raised)' }}
           >
             <BarChart3 className="w-6 h-6" />
             Статистика
@@ -163,15 +206,19 @@ export function DashboardScreen() {
 
           {/* Quick Stats — без изменений */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
+            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">24,5k</div>
+                <div className="text-2xl font-bold text-red-600">
+                  {totalExpenses.toLocaleString('ru-RU')} ₽
+                </div>
                 <div className="text-sm text-green-700 mt-1">Расходы</div>
               </CardContent>
             </Card>
-            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-flat)' }}>
+            <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">70,2k</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {totalIncome.toLocaleString('ru-RU')} ₽
+                </div>
                 <div className="text-sm text-green-700 mt-1">Доходы</div>
               </CardContent>
             </Card>

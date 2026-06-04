@@ -1,4 +1,4 @@
-import { db, type Transaction } from '../database';
+import { db, type Transaction } from '../database.ts';
 import {generateUUID} from "@/db/utils/uuid.ts";
 
 export const transactionService = {
@@ -19,13 +19,6 @@ export const transactionService = {
         return db.transactions
             .where('category_id').equals(category_id)
             .filter((t) => t.is_deleted === 0)
-            .toArray();
-    },
-
-    async getByDateRange(user_id: string, from: string, to: string): Promise<Transaction[]> {
-        return db.transactions
-            .where('transaction_date').between(from, to, true, true)
-            .filter((t) => t.user_id === user_id && t.is_deleted === 0)
             .toArray();
     },
 
