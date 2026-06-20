@@ -12,7 +12,10 @@ export interface Category {
     user_id: string;
     name: string;
     type: 'income' | 'expense';
-    is_deleted: 0 | 1;  // новое поле
+    is_deleted: 0 | 1;
+    icon_path: string;
+    background_color: string;
+    icon_color: string;
 }
 
 export interface Transaction {

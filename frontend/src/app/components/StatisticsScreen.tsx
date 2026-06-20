@@ -52,6 +52,7 @@ export function StatisticsScreen() {
   const navigate = useNavigate();
   const { userId } = useUser();
   const [timePeriod, setTimePeriod] = useState("month");
+  const [pieType, setPieType] = useState<'income' | 'expense'>('expense');
   const isMobile = window.innerWidth < 768;
 
   // Реальные данные из БД
@@ -73,7 +74,7 @@ export function StatisticsScreen() {
 
       const [summary, byCategory, daily, monthly, top] = await Promise.all([
         analyticsService.getSummary(userId, from, to),
-        analyticsService.getExpensesByCategory(userId, from, to),
+        analyticsService.getByCategory(userId, from, to, pieType),  // ← тип
         analyticsService.getDailyExpenses(userId),
         analyticsService.getMonthlyTrend(userId),
         analyticsService.getTopCategory(userId, from, to),
@@ -92,7 +93,7 @@ export function StatisticsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [timePeriod, userId]);
+  }, [timePeriod, userId, pieType]);
 
   // Загрузка при монтировании, смене периода и пользователя
   useEffect(() => {
@@ -214,7 +215,30 @@ export function StatisticsScreen() {
             <TabsContent value="pie" className="mt-6">
               <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-raised)' }}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-green-900">Расходы по категориям</CardTitle>
+                  <CardTitle className="text-lg text-green-900 flex items-center justify-between">
+                    <span>{pieType === 'expense' ? 'Расходы' : 'Доходы'} по категориям</span>
+                    {/* Переключатель Доход/Расход */}
+                    <div className="flex gap-1 bg-[#e8f5e9] p-1 rounded-xl" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
+                      <button
+                          type="button"
+                          onClick={() => setPieType('expense')}
+                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                              pieType === 'expense' ? 'bg-red-500 text-white' : 'text-green-700'
+                          }`}
+                      >
+                        Расход
+                      </button>
+                      <button
+                          type="button"
+                          onClick={() => setPieType('income')}
+                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                              pieType === 'income' ? 'bg-green-600 text-white' : 'text-green-700'
+                          }`}
+                      >
+                        Доход
+                      </button>
+                    </div>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {categoryData.length === 0 ? <EmptyChart /> : (
@@ -264,30 +288,36 @@ export function StatisticsScreen() {
             <TabsContent value="bar" className="mt-6">
               <Card className="border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-raised)' }}>
                 <CardHeader>
-                  <CardTitle className="text-lg text-green-900">Расходы по дням (30 дней)</CardTitle>
+                  <CardTitle className="text-lg text-green-900">Доходы и расходы по дням (30 дней)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {dailyData.every(d => d.amount === 0) ? <EmptyChart /> : (
-                      <ResponsiveContainer width="100%" height={320}>
-                        <BarChart data={dailyData} margin={{ bottom: 40 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
-                          <XAxis
-                              dataKey="day"
-                              stroke="#558b2f"
-                              tick={{ fontSize: 11 }}
-                              interval={4}
-                              angle={-45}
-                              textAnchor="end"
-                              height={50}
-                          />
-                          <YAxis stroke="#558b2f" />
-                          <Tooltip
-                              formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-                          />
-                          <Bar dataKey="amount" fill="#66bb6a" radius={[8, 8, 0, 0]} name="Расходы" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                  {dailyData.every(d => d.expense === 0 && d.income === 0) ? <EmptyChart /> : (
+                      <div className="overflow-x-auto">
+                        <div style={{ minWidth: isMobile ? 800 : '100%', height: 320 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={dailyData} margin={{ bottom: 40 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
+                              <XAxis
+                                  dataKey="day"
+                                  stroke="#558b2f"
+                                  tick={{ fontSize: 11 }}
+                                  interval={isMobile ? 0 : 4}
+                                  angle={-45}
+                                  textAnchor="end"
+                                  height={50}
+                              />
+                              <YAxis stroke="#558b2f" />
+                              <Tooltip
+                                  formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}
+                                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                              />
+                              <Legend />
+                              <Bar dataKey="income" fill="#66bb6a" radius={[8, 8, 0, 0]} name="Доходы" />
+                              <Bar dataKey="expense" fill="#ef5350" radius={[8, 8, 0, 0]} name="Расходы" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                   )}
                 </CardContent>
               </Card>
@@ -301,20 +331,24 @@ export function StatisticsScreen() {
                 </CardHeader>
                 <CardContent>
                   {trendData.every(d => d.income === 0 && d.expenses === 0) ? <EmptyChart /> : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={trendData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
-                          <XAxis dataKey="month" stroke="#558b2f" />
-                          <YAxis stroke="#558b2f" />
-                          <Tooltip
-                              formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-                          />
-                          <Legend />
-                          <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={3} name="Доходы" dot={{ r: 6 }} />
-                          <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={3} name="Расходы" dot={{ r: 6 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <div className="overflow-x-auto">
+                        <div style={{ minWidth: isMobile ? 600 : '100%', height: 300 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trendData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#c8e6c9" />
+                              <XAxis dataKey="month" stroke="#558b2f" />
+                              <YAxis stroke="#558b2f" />
+                              <Tooltip
+                                  formatter={(value) => `${Number(value).toLocaleString('ru-RU')} ₽`}
+                                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                              />
+                              <Legend />
+                              <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={3} name="Доходы" dot={{ r: 6 }} />
+                              <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={3} name="Расходы" dot={{ r: 6 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
                   )}
                 </CardContent>
               </Card>

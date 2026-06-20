@@ -92,14 +92,6 @@ export interface ApiCategoryCreate {
     icon_color: string;
 }
 
-/**
- * Дефолтные значения для полей категории, которых нет в локальной схеме.
- */
-const DEFAULT_CATEGORY_VISUALS = {
-    icon_path: 'static/icons/other.svg',
-    background_color: '#FFFFFF',
-    icon_color: '#000000',
-} as const;
 
 /**
  * Преобразует локальную категорию в тело запроса создания на сервере.
@@ -108,7 +100,9 @@ export function toApiCategoryCreate(c: Category): ApiCategoryCreate {
     return {
         name: c.name,
         type: c.type,
-        ...DEFAULT_CATEGORY_VISUALS,
+        icon_path: c.icon_path,
+        background_color: c.background_color,
+        icon_color: c.icon_color,
     };
 }
 
@@ -123,5 +117,8 @@ export function fromApiCategory(c: ApiCategory): Category {
         name: c.name,
         type: c.type,
         is_deleted: 0,
+        icon_path: c.icon_path,
+        background_color: c.background_color,
+        icon_color: c.icon_color,
     };
 }

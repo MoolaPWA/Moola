@@ -34,14 +34,14 @@ export const analyticsService = {
         };
     },
 
-    // Расходы по категориям за период (для PieChart)
-    async getExpensesByCategory(user_id: string, from: string, to: string) {
+    // Доходы или расходы по категориям за период (для PieChart)
+    async getByCategory(user_id: string, from: string, to: string, type: 'income' | 'expense') {
         const transactions = await db.transactions
             .where('user_id').equals(user_id)
             .filter((t) => {
                 const date = t.transaction_date.split('T')[0];
                 return t.is_deleted === 0 &&
-                    t.type === 'expense' &&
+                    t.type === type &&
                     date >= from &&
                     date <= to;
             })
@@ -66,7 +66,7 @@ export const analyticsService = {
             .sort((a, b) => b.value - a.value);
     },
 
-    // Расходы по дням за последние 30 дней (для BarChart)
+    // Доходы и расходы по дням за последние 30 дней (для BarChart)
     async getDailyExpenses(user_id: string) {
         const to = new Date();
         const from = new Date();
@@ -80,20 +80,23 @@ export const analyticsService = {
             .filter((t) => {
                 const date = t.transaction_date.split('T')[0];
                 return t.is_deleted === 0 &&
-                t.type === 'expense' &&
-                date >= fromStr &&
-                date <= toStr
+                    date >= fromStr &&
+                    date <= toStr;
             })
             .toArray();
 
-        // Группируем по дате
-        const grouped = new Map<string, number>();
+        // Группируем по дате отдельно доходы и расходы
+        const expenseByDay = new Map<string, number>();
+        const incomeByDay = new Map<string, number>();
         for (const t of transactions) {
             const date = t.transaction_date.split('T')[0];
-            grouped.set(date, (grouped.get(date) ?? 0) + t.amount);
+            if (t.type === 'expense') {
+                expenseByDay.set(date, (expenseByDay.get(date) ?? 0) + t.amount);
+            } else {
+                incomeByDay.set(date, (incomeByDay.get(date) ?? 0) + t.amount);
+            }
         }
 
-        // Заполняем все 30 дней, даже пустые
         const result = [];
         for (let i = 29; i >= 0; i--) {
             const date = new Date();
@@ -102,7 +105,8 @@ export const analyticsService = {
             result.push({
                 id: dateStr,
                 day: date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
-                amount: grouped.get(dateStr) ?? 0,
+                expense: expenseByDay.get(dateStr) ?? 0,
+                income: incomeByDay.get(dateStr) ?? 0,
             });
         }
 
@@ -138,7 +142,7 @@ export const analyticsService = {
 
     // Самая затратная категория
     async getTopCategory(user_id: string, from: string, to: string): Promise<string> {
-        const data = await analyticsService.getExpensesByCategory(user_id, from, to);
+        const data = await analyticsService.getByCategory(user_id, from, to, 'expense');
         return data[0]?.name ?? '—';
     },
 };
