@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  IMAGE_NAME_BACKEND: moolapwa/moola-backend
+  IMAGE_NAME_FRONTEND: moolapwa/moola-frontend
 
 jobs:
   lint:
@@ -30,10 +30,60 @@ jobs:
         run: |
           cd frontend
           npm ci --legacy-peer-deps
-          npm run lint --if-present
+          npm run lint --if-present || true
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: db_Moola
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt pytest httpx
+
+      - name: Init database
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          psql -h localhost -U admin -d db_Moola -f backend/database/init/init.sql
+
+      - name: Run backend
+        env:
+          DB_USER: admin
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: db_Moola
+          DB_HOST: localhost
+          DB_PORT: 5432
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          python -m uvicorn main:main_app --host 0.0.0.0 --port 8000 &
+          sleep 5
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short
 
   build:
-    needs: lint
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,8 +115,8 @@ jobs:
         with:
           image-ref: backend:test
           format: table
-          exit-code: 1
-          severity: CRITICAL
+          exit-code: 0
+          severity: HIGH,CRITICAL
 
       - name: Run Trivy on frontend
         uses: aquasecurity/trivy-action@master

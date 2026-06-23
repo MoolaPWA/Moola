@@ -187,7 +187,7 @@ export function DashboardScreen() {
                 style={{ boxShadow: 'var(--shadow-neu-raised)' }}
             >
               <List className="w-6 h-6" />
-              Список операций
+              Операции и категории
             </Button>
           </div>
 
