@@ -9,6 +9,9 @@ import { useSync } from "@/hooks/useSync";
 import { RefreshCw } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { analyticsService } from "@/db/services/analyticsService";
+import { CategoryIcon } from "./CategoryIcon";
+import { categoryService } from "@/db/services/categoryService";
+import type { Category } from "@/db/database";
 
 
 export function DashboardScreen() {
@@ -53,6 +56,7 @@ export function DashboardScreen() {
 
   const navigate = useNavigate();
   const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
@@ -64,6 +68,10 @@ export function DashboardScreen() {
     try {
       const data = await transactionService.getLatest(userId, 3);
       setLatestTransactions(data);
+
+      // Категории для иконок
+      const cats = await categoryService.getAllByUser(userId);
+      setCategories(cats);
 
       const now = new Date();
       const from = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -179,7 +187,7 @@ export function DashboardScreen() {
                 style={{ boxShadow: 'var(--shadow-neu-raised)' }}
             >
               <List className="w-6 h-6" />
-              Список операций
+              Операции и категории
             </Button>
           </div>
 
@@ -259,7 +267,26 @@ export function DashboardScreen() {
                           style={{ boxShadow: 'var(--shadow-neu-pressed)' }}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="text-2xl">📝</div>
+                          <div className="text-2xl">{(() => {
+                            const cat = categories.find(c => c.id === t.category_id);
+                            return cat ? (
+                                <CategoryIcon
+                                    iconPath={cat.icon_path}
+                                    type={cat.type}
+                                    backgroundColor={cat.background_color}
+                                    iconColor={cat.icon_color}
+                                    size={40}
+                                />
+                            ) : (
+                                <CategoryIcon
+                                    iconPath=""
+                                    type={t.type}
+                                    backgroundColor="#FFFFFF"
+                                    iconColor="#000000"
+                                    size={40}
+                                />
+                            );
+                          })()}</div>
                           <div>
                             <div className="font-medium text-green-900">
                               {t.description || "Без описания"}

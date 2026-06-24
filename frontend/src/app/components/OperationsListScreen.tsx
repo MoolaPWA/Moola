@@ -13,11 +13,18 @@ import { transactionService } from "@/db/services/transactionService";
 import { categoryService } from "@/db/services/categoryService";
 import type { Transaction, Category } from "@/db/database";
 import { useUser } from "@/context/UserContext";
+import {IconPicker} from "@/app/components/IconPicker.tsx"
+import {CategoryIcon} from "@/app/components/CategoryIcon.tsx"
+import { useSync } from "@/hooks/useSync";
+import {toApiCategoryCreate} from "@/services/api/mappers.ts"
+import {updateCategory} from "@/services/api/categories.ts"
+
 
 
 export function OperationsListScreen() {
   const navigate = useNavigate();
   const { userId } = useUser();
+  const { sync } = useSync();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -41,9 +48,14 @@ export function OperationsListScreen() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryFormData, setCategoryFormData] = useState({
     name: "",
-    icon: "",
     type: "expense" as "income" | "expense",
+    icon_path: "",
+    icon_color: "#000000",
+    background_color: "#FFFFFF",
   });
+
+// Раскрыт ли пикер иконок в диалоге
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   // Редактирование операции
   const [isEditingOperation, setIsEditingOperation] = useState(false);
@@ -147,13 +159,22 @@ export function OperationsListScreen() {
       setEditingCategory(category);
       setCategoryFormData({
         name: category.name,
-        icon: category.name,
         type: category.type,
+        icon_path: category.icon_path,
+        icon_color: category.icon_color,
+        background_color: category.background_color,
       });
     } else {
       setEditingCategory(null);
-      setCategoryFormData({ name: "", icon: "", type: "expense" });
+      setCategoryFormData({
+        name: "",
+        type: "expense",
+        icon_path: "",          // пусто → в добавлении покажем плюс-плейсхолдер
+        icon_color: "#000000",  // дефолт по ТЗ
+        background_color: "#FFFFFF", // дефолт по ТЗ
+      });
     }
+    setIsIconPickerOpen(false); // пикер закрыт при открытии диалога
     setIsCategoryDialogOpen(true);
   };
 
@@ -179,25 +200,53 @@ export function OperationsListScreen() {
   };
 
   const handleSaveCategory = async () => {
+    // Проверка дубликата (имя + тип) среди локальных категорий
+    if (!editingCategory) {
+      const nameTrimmed = categoryFormData.name.trim().toLowerCase();
+      const duplicate = categories.find(
+          (c) => c.name.trim().toLowerCase() === nameTrimmed
+              && c.type === categoryFormData.type
+      );
+      if (duplicate) {
+        toast.error("Категория с таким названием и типом уже существует");
+        return;
+      }
+    }
+
     try {
       if (editingCategory) {
-        await categoryService.update(editingCategory.id, {
-          name: categoryFormData.name,
-          type: categoryFormData.type,
-        });
+        const updated = { ...editingCategory, ...categoryFormData };
+        const serverCategory = await updateCategory(
+            editingCategory.id,
+            toApiCategoryCreate(updated)
+        );
+        await categoryService.update(editingCategory.id, serverCategory);
         toast.success("Категория обновлена!");
       } else {
+        // Дефолт в серверном формате (static/icons/...)
+        const iconPath = categoryFormData.icon_path
+            || (categoryFormData.type === 'expense'
+                ? 'static/icons/badge-plus.svg'
+                : 'static/icons/badge-dollar-sign.svg');
+
         await categoryService.create({
           user_id: userId!,
           name: categoryFormData.name,
           type: categoryFormData.type,
           is_deleted: 0,
+          icon_path: iconPath,
+          background_color: categoryFormData.background_color,
+          icon_color: categoryFormData.icon_color,
         });
         toast.success("Категория создана!");
+        await loadCategories();
+        setIsCategoryDialogOpen(false);
+        sync(true);
       }
       await loadCategories();
       setIsCategoryDialogOpen(false);
     } catch (error) {
+      console.error('Ошибка сохранения категории:', error);
       toast.error("Не удалось сохранить категорию");
     }
   };
@@ -420,7 +469,26 @@ export function OperationsListScreen() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4">
                                 <div className="text-3xl">
-                                  {categories.find(c => c.id === operation.category_id)?.name?.[0] ?? "📝"}
+                                  {(() => {
+                                    const cat = categories.find(c => c.id === operation.category_id);
+                                    return cat ? (
+                                        <CategoryIcon
+                                            iconPath={cat.icon_path}
+                                            type={cat.type}
+                                            backgroundColor={cat.background_color}
+                                            iconColor={cat.icon_color}
+                                            size={48}
+                                        />
+                                    ) : (
+                                        <CategoryIcon
+                                            iconPath=""
+                                            type={operation.type}
+                                            backgroundColor="#FFFFFF"
+                                            iconColor="#000000"
+                                            size={48}
+                                        />
+                                    );
+                                  })()}
                                 </div>
                                 <div>
                                   <div className="font-semibold text-green-900">{operation.description || "Без описания"}</div>
@@ -484,7 +552,13 @@ export function OperationsListScreen() {
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className="text-3xl">📁</div>
+                            <CategoryIcon
+                                iconPath={category.icon_path}
+                                type={category.type}
+                                backgroundColor={category.background_color}
+                                iconColor={category.icon_color}
+                                size={48}
+                            />
                             <div>
                               <div className="font-semibold text-green-900">{category.name}</div>
                               <div className="text-sm text-green-700">
@@ -511,6 +585,7 @@ export function OperationsListScreen() {
               </div>
 
               {/* Category Dialog */}
+              {/* Category Dialog */}
               <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
                 <DialogContent className="rounded-2xl">
                   <DialogHeader>
@@ -534,7 +609,11 @@ export function OperationsListScreen() {
                       <Label className="text-green-900">Тип</Label>
                       <Select
                           value={categoryFormData.type}
-                          onValueChange={(v) => setCategoryFormData({ ...categoryFormData, type: v as "income" | "expense" })}
+                          onValueChange={(v) => setCategoryFormData({
+                            ...categoryFormData,
+                            type: v as "income" | "expense",
+                            icon_path: "", // сброс иконки при смене типа — иконки разные для дохода/расхода
+                          })}
                       >
                         <SelectTrigger className="rounded-xl border-0 bg-[#e8f5e9]" style={{ boxShadow: 'var(--shadow-neu-pressed)' }}>
                           <SelectValue />
@@ -544,6 +623,74 @@ export function OperationsListScreen() {
                           <SelectItem value="income">Доход</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {/* Графа "Иконка" */}
+                    <div className="space-y-2">
+                      <Label className="text-green-900">Иконка</Label>
+
+                      {!isIconPickerOpen ? (
+                          // Обычное состояние: слева иконка, справа цвет и фон
+                          <div className="flex items-center gap-4">
+                            {/* Текущая иконка — клик раскрывает пикер */}
+                            <button
+                                type="button"
+                                onClick={() => setIsIconPickerOpen(true)}
+                                className="shrink-0"
+                            >
+                              {categoryFormData.icon_path ? (
+                                  <CategoryIcon
+                                      iconPath={categoryFormData.icon_path}
+                                      type={categoryFormData.type}
+                                      backgroundColor={categoryFormData.background_color}
+                                      iconColor={categoryFormData.icon_color}
+                                      size={56}
+                                  />
+                              ) : (
+                                  // Плейсхолдер "плюс" для новой категории без иконки
+                                  <div
+                                      className="rounded-xl flex items-center justify-center border-2 border-dashed border-green-400"
+                                      style={{ width: 56, height: 56 }}
+                                  >
+                                    <Plus className="w-6 h-6 text-green-500" />
+                                  </div>
+                              )}
+                            </button>
+
+                            {/* Цвет иконки и фон */}
+                            <div className="flex gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-green-700">Цвет иконки</Label>
+                                <input
+                                    type="color"
+                                    value={categoryFormData.icon_color}
+                                    onChange={(e) => setCategoryFormData({ ...categoryFormData, icon_color: e.target.value })}
+                                    className="block w-10 h-10 rounded-lg cursor-pointer border border-green-200"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-green-700">Фон</Label>
+                                <input
+                                    type="color"
+                                    value={categoryFormData.background_color}
+                                    onChange={(e) => setCategoryFormData({ ...categoryFormData, background_color: e.target.value })}
+                                    className="block w-10 h-10 rounded-lg cursor-pointer border border-green-200"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                      ) : (
+                          // Раскрытый пикер — выбор иконки закрывает его
+                          <IconPicker
+                              type={categoryFormData.type}
+                              iconColor={categoryFormData.icon_color}
+                              backgroundColor={categoryFormData.background_color}
+                              onSelect={(path) => {
+                                setCategoryFormData({ ...categoryFormData, icon_path: path });
+                                setIsIconPickerOpen(false);
+                              }}
+                          />
+                      )}
                     </div>
                   </div>
                   <DialogFooter className="pt-4">

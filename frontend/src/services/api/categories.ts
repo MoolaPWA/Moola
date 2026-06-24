@@ -3,6 +3,7 @@ import {
     toApiCategoryCreate,
     fromApiCategory,
     type ApiCategory,
+    type ApiCategoryCreate,
 } from './mappers';
 import type { Category } from '@/db/database';
 
@@ -39,4 +40,18 @@ export async function deleteCategory(categoryId: string): Promise<void> {
     await apiRequest<void>(`/api/categories/${categoryId}`, {
         method: 'DELETE',
     });
+}
+
+/**
+ * Обновляет категорию на сервере (иконка, цвет, фон, название).
+ */
+export async function updateCategory(
+    categoryId: string,
+    data: ApiCategoryCreate
+): Promise<Category> {
+    const response = await apiRequest<ApiCategory>(`/api/categories/${categoryId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
+    return fromApiCategory(response);
 }
