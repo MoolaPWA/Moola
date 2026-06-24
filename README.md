@@ -98,7 +98,7 @@ npm run build
 
 ## 🛡️ Модель безопасности (кратко)
 
-- Access‑токен (15 мин) в памяти, refresh‑токен (7 дней) в IndexedDB
+- Access‑токен (15 мин) в памяти, refresh‑токен (30 дней) в IndexedDB
 - Автоматическое бесшовное обновление токенов при 401
 - Rate limiting на /auth/* (5 req/min) и /transactions/sync (10 req/min)
 - CORS только для доверенных доменов, заголовки безопасности (nosniff, DENY)
